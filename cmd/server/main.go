@@ -47,6 +47,17 @@ func HandleUnknownMetric(res http.ResponseWriter) {
 	http.Error(res, "unknown type metric!", http.StatusBadRequest)
 }
 
+func removeEmptyStrings(url []string) []string {
+	result := make([]string, 0, len(url))
+	for _, str := range url {
+		if str != "" {
+			result = append(result, str)
+		}
+	}
+
+	return result
+}
+
 func mainHandle(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 
@@ -61,6 +72,7 @@ func mainHandle(storage ms.Collector) http.HandlerFunc {
 		}
 
 		parts := strings.Split(req.URL.Path, "/")
+		parts = removeEmptyStrings(parts)
 
 		if len(parts) != 4 && parts[0] != "update" {
 			http.Error(res, "invalid request", http.StatusBadRequest)
@@ -97,7 +109,7 @@ func main() {
 	storage := ms.NewMemStorage()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/update", mainHandle(storage))
+	mux.HandleFunc("/update/", mainHandle(storage))
 
 	if err := http.ListenAndServe(`:8080`, mux); err != nil {
 		panic(err)
