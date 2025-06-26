@@ -5,9 +5,10 @@ type counter struct {
 	value int64
 }
 
-func NewCounter(name string) Metric {
+func NewCounter(name string, value int64) Metric {
 	return &counter{
-		name: name,
+		name:  name,
+		value: value,
 	}
 }
 
@@ -21,4 +22,13 @@ func (c *counter) Type() string {
 
 func (c *counter) Value() interface{} {
 	return c.value
+}
+
+func (c *counter) SetValue(v interface{}) error {
+	val, ok := v.(int64)
+	if !ok {
+		return ErrInvalidValueType
+	}
+	c.value = val
+	return nil
 }

@@ -4,9 +4,11 @@ type gauge struct {
 	name  string
 	value float64
 }
-func NewGauge(name string) Metric {
+
+func NewGauge(name string, value float64) Metric {
 	return &gauge{
-		name: name,
+		name:  name,
+		value: value,
 	}
 }
 
@@ -20,4 +22,13 @@ func (g *gauge) Type() string {
 
 func (g *gauge) Value() interface{} {
 	return g.value
+}
+
+func (g *gauge) SetValue(v interface{}) error {
+	val, ok := v.(float64)
+	if !ok {
+		return ErrInvalidValueType
+	}
+	g.value = val
+	return nil
 }
