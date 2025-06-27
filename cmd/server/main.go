@@ -9,38 +9,24 @@ import (
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 )
 
-func HandleCounter(res http.ResponseWriter, name, value string) mtr.Metric {
+func HandleCounter(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
 	val, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
-		http.Error(res, "invalid value metric", http.StatusBadRequest)
-		return nil
+		//http.Error(res, "invalid value metric", http.StatusBadRequest)
+		return nil, err
 	}
 
-	counter := mtr.NewCounter(name, val)
-	// if err := counter.SetValue(val); err != nil {
-	// 	http.Error(res, err.Error(), http.StatusBadRequest)
-	// 	return nil
-	// }
-
-	res.WriteHeader(http.StatusOK)
-	return counter
+	return mtr.NewCounter(name, val), nil
 }
 
-func HandleGauge(res http.ResponseWriter, name, value string) mtr.Metric {
+func HandleGauge(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
 	val, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		http.Error(res, "invalid value metric", http.StatusBadRequest)
-		return nil
+		//http.Error(res, "invalid value metric", http.StatusBadRequest)
+		return nil, err
 	}
 
-	gauge := mtr.NewGauge(name, val)
-	// if err := gauge.SetValue(val); err != nil {
-	// 	http.Error(res, err.Error(), http.StatusBadRequest)
-	// 	return nil
-	// }
-
-	res.WriteHeader(http.StatusOK)
-	return gauge
+	return mtr.NewGauge(name, val), nil
 }
 
 func HandleUnknownMetric(res http.ResponseWriter) {
@@ -71,29 +57,37 @@ func mainHandle(storage ms.Collector) http.HandlerFunc {
 			return
 		}
 
-		parts := strings.Split(req.URL.Path, "/")
+		parts := strings.Split(strings.Trim(req.URL.Path, "/"), "/")
 		parts = removeEmptyStrings(parts)
 
-		if len(parts) != 4 && parts[0] != "update" {
-			http.Error(res, "invalid request", http.StatusBadRequest)
+		if len(parts) != 4 || parts[0] != "update" {
+			http.Error(res, "invalid request", http.StatusNotFound)
 			return
 		}
 
 		metricType, name, value := parts[1], parts[2], parts[3]
 
 		if name == "" {
-			http.Error(res, "metric name is missing", http.StatusFound)
+			http.Error(res, "metric name is missing", http.StatusNotFound)
 			return
 		}
 
 		var metric mtr.Metric
+		var err error
+
 		switch metricType {
 		case mtr.GaugeType:
-			metric = HandleGauge(res, name, value)
+			metric, err = HandleGauge(res, name, value)
 		case mtr.CounterType:
-			metric = HandleCounter(res, name, value)
+			metric, err = HandleCounter(res, name, value)
 		default:
 			HandleUnknownMetric(res)
+			return
+		}
+
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusBadRequest)
+			return
 		}
 
 		if err := storage.UpdateMetric(metric); err != nil {
