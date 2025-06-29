@@ -7,6 +7,7 @@ import (
 
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/MemStorage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
 )
 
 func HandleCounter(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
@@ -47,6 +48,8 @@ func removeEmptyStrings(url []string) []string {
 func mainHandle(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 
+		log.Debug("Incoming request: %s %s", req.Method, req.URL.Path)
+
 		if req.Method != http.MethodPost {
 			http.Error(res, "use only POST request", http.StatusMethodNotAllowed)
 			return
@@ -66,6 +69,7 @@ func mainHandle(storage ms.Collector) http.HandlerFunc {
 		}
 
 		metricType, name, value := parts[1], parts[2], parts[3]
+		log.Debug("Parsed metric: type=%s, name=%s, value=%s", metricType, name, value)
 
 		if name == "" {
 			http.Error(res, "metric name is missing", http.StatusNotFound)
@@ -95,11 +99,16 @@ func mainHandle(storage ms.Collector) http.HandlerFunc {
 			return
 		}
 
+		log.Info("Metric updated successfully: %s %s = %s", metricType, name, value)
 		res.WriteHeader(http.StatusOK)
 	}
 }
 
 func main() {
+	log.Init(log.DebugLevel, "logFile.log")
+	defer log.Destroy()
+
+	log.Debug("START>")
 	storage := ms.NewMemStorage()
 
 	mux := http.NewServeMux()
@@ -108,4 +117,5 @@ func main() {
 	if err := http.ListenAndServe(`:8080`, mux); err != nil {
 		panic(err)
 	}
+	log.Debug("END<")
 }
