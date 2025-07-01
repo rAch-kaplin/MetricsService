@@ -108,7 +108,7 @@ func main() {
 	log.Init(log.DebugLevel, "logFile.log")
 	defer log.Destroy()
 
-	log.Debug("START>")
+	log.Debug("START SERVER>")
 	storage := ms.NewMemStorage()
 
 	mux := http.NewServeMux()
@@ -117,5 +117,5 @@ func main() {
 	if err := http.ListenAndServe(`:8080`, mux); err != nil {
 		panic(err)
 	}
-	log.Debug("END<")
+	log.Debug("END SERVER<")
 }
