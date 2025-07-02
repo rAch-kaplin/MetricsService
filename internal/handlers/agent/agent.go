@@ -2,11 +2,12 @@ package agent
 
 import (
 	"fmt"
-	"io"
 	"math/rand"
 	"net/http"
 	"runtime"
 	"time"
+
+	"github.com/go-resty/resty/v2"
 
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
@@ -173,6 +174,10 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 			if stat.Type == mtr.GaugeType {
 				metric = mtr.NewGauge(stat.Name, v)
 			}
+		case uint32:
+            if stat.Type == mtr.GaugeType {
+                metric = mtr.NewGauge(stat.Name, float64(v))
+            }
 		default:
 			log.Error("ERROR: Unknown type for metric %s: %T", stat.Name, value)
 			continue
@@ -187,7 +192,7 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 	storage.UpdateMetric(mtr.NewGauge("RandomValue", rand.Float64()))
 }
 
-func sendAllMetrics(client *http.Client, storage *ms.MemStorage) {
+func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 	gauges, counters := storage.GetAllMetrics()
 
 	for name, value := range gauges {
@@ -199,26 +204,22 @@ func sendAllMetrics(client *http.Client, storage *ms.MemStorage) {
 	}
 }
 
-func sendMetric(client *http.Client, mType string, mName string, mValue interface{}) {
+func sendMetric(client *resty.Client, mType string, mName string, mValue interface{}) {
 	url := fmt.Sprintf("%s/update/%s/%s/%v", serverAddress, mType, mName, mValue)
 
-	req, err := http.NewRequest(http.MethodPost, url, http.NoBody)
+	res, err := client.R().
+		SetHeader("Content-Type", "text/plain").
+		Post(url)
+
 	if err != nil {
-		log.Error("Error creating a request for %s: %v\n", mName, err)
+		log.Error("Error creating a request for %s: %v", mName, err)
 		return
 	}
-	req.Header.Set("Content-Type", "text-plain")
 
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Error("Error sending metric: %s: %v\n", mName, err)
-		return
-	}
-	defer resp.Body.Close()
-
-	_, err = io.Copy(io.Discard, resp.Body)
-	if err != nil {
-		log.Error("Failed to read response body from %s: %v", url, err)
+	if res.StatusCode() != http.StatusOK {
+		log.Error("Server returned non-OK status for %s/%s: %d %s", mType, mName, res.StatusCode(), res.String())
+	} else {
+		log.Debug("Metric %s/%s sent successfully. Status: %d", mType, mName, res.StatusCode())
 	}
 }
 
@@ -230,7 +231,7 @@ func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
 	}
 }
 
-func ReportLoop(client *http.Client, storage *ms.MemStorage, interval time.Duration) {
+func ReportLoop(client *resty.Client, storage *ms.MemStorage, interval time.Duration) {
 	log.Debug("reportLoop ...")
 	for {
 		time.Sleep(interval)

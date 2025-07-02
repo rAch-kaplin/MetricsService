@@ -1,16 +1,25 @@
 package server
 
 import (
+	"fmt"
+	"html/template"
 	"net/http"
 	"strconv"
-	"strings"
 
+	"github.com/go-chi/chi/v5"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
 )
 
-func HandleCounter(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
+type MetricTable struct {
+	Name  string
+	Type  string
+	Value string
+}
+
+// FIXME other function name
+func NewCounter(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
 	val, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
 		http.Error(res, "invalid value metric", http.StatusBadRequest)
@@ -20,7 +29,8 @@ func HandleCounter(res http.ResponseWriter, name, value string) (mtr.Metric, err
 	return mtr.NewCounter(name, val), nil
 }
 
-func HandleGauge(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
+// FIXME other function name
+func NewGauge(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
 	val, err := strconv.ParseFloat(value, 64)
 	if err != nil {
 		http.Error(res, "invalid value metric", http.StatusBadRequest)
@@ -34,56 +44,131 @@ func HandleUnknownMetric(res http.ResponseWriter) {
 	http.Error(res, "unknown type metric!", http.StatusBadRequest)
 }
 
-func removeEmptyStrings(url []string) []string {
-	result := make([]string, 0, len(url))
-	for _, str := range url {
-		if str != "" {
-			result = append(result, str)
-		}
-	}
+func GetMetric(storage ms.Collector) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		log.Debug("Incoming GET request: %s %s", req.Method, req.URL.Path)
 
-	return result
+		mType := chi.URLParam(req, "mType")
+		mName := chi.URLParam(req, "mName")
+		log.Debug("Incoming request for metric: Type=%s, Name=%s", mType, mName)
+
+		value, found := storage.GetMetric(mType, mName)
+		if !found {
+			http.Error(res, fmt.Sprintf("Metric %s was not found", mName), http.StatusNotFound)
+			return
+		}
+
+		var valueStr string
+		switch v := value.(type) {
+		case float64:
+			valueStr = strconv.FormatFloat(v, 'f', -1, 64)
+		case int64:
+			valueStr = strconv.FormatInt(v, 10)
+		default:
+			http.Error(res, "an unexpected type of metric", http.StatusInternalServerError)
+			return //FIXME fix this case
+		}
+
+		res.Header().Set("Content-Type", "text/plain")
+		res.WriteHeader(http.StatusOK)
+		res.Write([]byte(valueStr))
+
+		log.Debug("the metric has been send")
+	}
 }
 
-func MainHandle(storage ms.Collector) http.HandlerFunc {
+func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
+		gauges, counters := storage.GetAllMetrics()
 
-		log.Debug("Incoming request: %s %s", req.Method, req.URL.Path)
+		var metricsToTable []MetricTable
 
-		if req.Method != http.MethodPost {
-			http.Error(res, "use only POST request", http.StatusMethodNotAllowed)
+		for name, value := range gauges {
+			metricsToTable = append(metricsToTable, MetricTable{
+				Name:  name,
+				Type:  mtr.GaugeType,
+				Value: strconv.FormatFloat(value, 'f', -1, 64),
+			})
+		}
+		for name, value := range counters {
+			metricsToTable = append(metricsToTable, MetricTable{
+				Name:  name,
+				Type:  mtr.CounterType,
+				Value: strconv.FormatInt(value, 10),
+			})
+		}
+
+		const htmlTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Metrics</title>
+</head>
+<body>
+    <h1>Metric</h1>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Name of Metric</th>
+                <th>Type</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .}}
+            <tr>
+                <td>{{.Name}}</td>
+                <td>{{.Type}}</td>
+                <td>{{.Value}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</body>
+</html>
+`
+
+		template, err := template.New("Metrics").Parse(htmlTemplate)
+		if err != nil {
+			log.Error("couldn't make it out HTML template: %v", err)
+			http.Error(res, "Internal server error, failed html-template", http.StatusInternalServerError)
 			return
 		}
 
-		if req.Header.Get("Content-Type") != "text/plain" {
-			http.Error(res, "use only text/plain", http.StatusBadRequest)
-			return
+		res.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+		if err := template.Execute(res, metricsToTable); err != nil {
+			log.Error("failed complete template: %v", err)
 		}
 
-		parts := strings.Split(strings.Trim(req.URL.Path, "/"), "/")
-		parts = removeEmptyStrings(parts)
+		log.Debug("the metrics has been send")
+		res.WriteHeader(http.StatusOK)
+	}
+}
 
-		if len(parts) != 4 || parts[0] != "update" {
-			http.Error(res, "invalid request", http.StatusNotFound)
-			return
-		}
+func UpdateMetric(storage ms.Collector) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		log.Debug("Incoming POST request: %s %s", req.Method, req.URL.Path)
 
-		metricType, name, value := parts[1], parts[2], parts[3]
-		log.Debug("Parsed metric: type=%s, name=%s, value=%s", metricType, name, value)
+		mType := chi.URLParam(req, "mType")
+		mName := chi.URLParam(req, "mName")
+		mValue := chi.URLParam(req, "mValue")
+		log.Debug("Parsed metric: type=%s, name=%s, value=%s", mType, mName, mValue)
 
-		if name == "" {
-			http.Error(res, "metric name is missing", http.StatusNotFound)
+		if mName == "" {
+			log.Error("the metric name is not specified")
+			http.Error(res, "the metric name is not specified", http.StatusBadRequest)
 			return
 		}
 
 		var metric mtr.Metric
 		var err error
 
-		switch metricType {
+		switch mType {
 		case mtr.GaugeType:
-			metric, err = HandleGauge(res, name, value)
+			metric, err = NewGauge(res, mName, mValue)
 		case mtr.CounterType:
-			metric, err = HandleCounter(res, name, value)
+			metric, err = NewCounter(res, mName, mValue)
 		default:
 			HandleUnknownMetric(res)
 			return
@@ -99,7 +184,7 @@ func MainHandle(storage ms.Collector) http.HandlerFunc {
 			return
 		}
 
-		log.Info("Metric updated successfully: %s %s = %s", metricType, name, value)
+		log.Info("Metric updated successfully: %s %s = %s", mType, mName, mValue)
 		res.WriteHeader(http.StatusOK)
 	}
 }
