@@ -1,4 +1,4 @@
-package MemStorage
+package memstorage
 
 import (
 	"sync"
@@ -15,7 +15,6 @@ type MemStorage struct {
 	mutex    sync.RWMutex
 	gauges   map[string]float64
 	counters map[string]int64
-	//metrics map[string]metrics.Metric
 }
 
 func NewMemStorage() *MemStorage {

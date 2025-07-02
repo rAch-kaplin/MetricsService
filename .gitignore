@@ -32,3 +32,6 @@ go.work.sum
 .vscode
 logFile.log
 cmd/server/server
+
+cmd/server/server
+cmd/agent/agent
