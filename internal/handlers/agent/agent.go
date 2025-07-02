@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"time"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memStorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
 )

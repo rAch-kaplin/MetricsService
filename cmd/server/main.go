@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memStorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
 )

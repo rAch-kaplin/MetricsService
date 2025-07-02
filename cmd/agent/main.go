@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memStorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/agent"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
 )

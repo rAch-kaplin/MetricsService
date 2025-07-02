@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"net/http"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memStorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 )
 
 func TestMainHandle(t *testing.T) {
