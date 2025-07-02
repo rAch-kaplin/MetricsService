@@ -53,12 +53,12 @@ func TestMainHandle(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			req := httptest.NewRequest(test.method, test.url, nil)
-			defer req.Body.Close()
 			req.Header.Set("Content-Type", "text/plain")
 			w := httptest.NewRecorder()
 			handler(w, req)
 
 			res := w.Result()
+			defer res.Body.Close()
 			if res.StatusCode != test.wantStatus {
 				t.Errorf("expected status %d, got %d", test.wantStatus, res.StatusCode)
 			}
