@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"net/http"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/MemStorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memStorage"
 )
 
 func TestMainHandle(t *testing.T) {
@@ -53,6 +53,7 @@ func TestMainHandle(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			req := httptest.NewRequest(test.method, test.url, nil)
+			defer req.Body.Close()
 			req.Header.Set("Content-Type", "text/plain")
 			w := httptest.NewRecorder()
 			handler(w, req)

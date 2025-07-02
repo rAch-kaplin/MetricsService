@@ -5,7 +5,6 @@ import (
 )
 
 type Metric interface {
-	//SetValue(val interface{}) error
 	Value() interface{}
 	Name() string
 	Type() string

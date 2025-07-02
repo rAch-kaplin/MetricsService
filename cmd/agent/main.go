@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/MemStorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memStorage"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/agent"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
 )
@@ -28,6 +28,6 @@ func main() {
 	go agent.CollectionLoop(storage, pollInterval)
 	go agent.ReportLoop(client, storage, reportInterval)
 
-	select {}
 	log.Debug("END AGENT<")
+	select {}
 }

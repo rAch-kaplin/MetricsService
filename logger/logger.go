@@ -51,7 +51,7 @@ func Init(level LogLevel, logFileName string) error {
 	if logFileName != "" {
 		file, err := os.Create(logFileName)
 		if err != nil {
-			return fmt.Errorf("Failed to open log file %s: %w", logFileName, err)
+			return fmt.Errorf("failed to open log file %s: %w", logFileName, err)
 		}
 		log.out = file
 	} else {
