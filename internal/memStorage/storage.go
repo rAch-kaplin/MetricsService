@@ -1,4 +1,4 @@
-package MemStorage
+package memStorage
 
 import (
 	"sync"
