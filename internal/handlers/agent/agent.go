@@ -14,10 +14,6 @@ import (
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
 )
 
-const (
-	serverAddress = "http://localhost:8080"
-)
-
 type MemRuntimeStat struct {
 	Name string
 	Type string
@@ -192,20 +188,20 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 	storage.UpdateMetric(mtr.NewGauge("RandomValue", rand.Float64()))
 }
 
-func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
+func sendAllMetrics(client *resty.Client, endPointAddr string, storage *ms.MemStorage) {
 	gauges, counters := storage.GetAllMetrics()
 
 	for name, value := range gauges {
-		sendMetric(client, mtr.GaugeType, name, value)
+		sendMetric(client, endPointAddr, mtr.GaugeType, name, value)
 	}
 
 	for name, value := range counters {
-		sendMetric(client, mtr.CounterType, name, value)
+		sendMetric(client, endPointAddr, mtr.CounterType, name, value)
 	}
 }
 
-func sendMetric(client *resty.Client, mType string, mName string, mValue interface{}) {
-	url := fmt.Sprintf("%s/update/%s/%s/%v", serverAddress, mType, mName, mValue)
+func sendMetric(client *resty.Client, endPointAddr string, mType string, mName string, mValue interface{}) {
+	url := fmt.Sprintf("%s/update/%s/%s/%v", endPointAddr, mType, mName, mValue)
 
 	res, err := client.R().
 		SetHeader("Content-Type", "text/plain").
@@ -231,10 +227,10 @@ func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
 	}
 }
 
-func ReportLoop(client *resty.Client, storage *ms.MemStorage, interval time.Duration) {
+func ReportLoop(client *resty.Client, endPointAddr string, storage *ms.MemStorage, interval time.Duration) {
 	log.Debug("reportLoop ...")
 	for {
 		time.Sleep(interval)
-		sendAllMetrics(client, storage)
+		sendAllMetrics(client, endPointAddr, storage)
 	}
 }

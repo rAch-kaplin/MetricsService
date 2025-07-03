@@ -78,10 +78,12 @@ func main() {
 	var opts options
 	flagsInit(&opts)
 
-	client := resty.New().SetTimeout(5 * time.Second)
+	client := resty.New().
+		SetTimeout(5 * time.Second).
+		SetBaseURL("http://" + opts.endPointAddr)
 
 	go agent.CollectionLoop(storage, time.Duration(opts.pollInterval)*time.Second)
-	go agent.ReportLoop(client, storage, time.Duration(opts.reportInterval)*time.Second)
+	go agent.ReportLoop(client, opts.endPointAddr, storage, time.Duration(opts.reportInterval)*time.Second)
 
 	log.Debug("END AGENT<")
 	select {}
