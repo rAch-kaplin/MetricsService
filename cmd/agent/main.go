@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/caarlos0/env/v6"
 	"github.com/go-resty/resty/v2"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/agent"
@@ -23,19 +24,48 @@ const (
 
 type options struct {
 	endPointAddr   string
-	pollInterval   uint
-	reportInterval uint
+	pollInterval   int
+	reportInterval int
 }
 
-func flagsInit(opts *options) {
+type envConfig struct {
+	endPointAddr   string `env:"ADDRESS"`
+	pollInterval   int    `env:"POLL_INTERVAL"`
+	reportInterval int    `env:"REPORT_INTERVAL"`
+}
+
+func envAndFlagsInit() *options {
+	var cfg envConfig
+	err := env.Parse(&cfg)
+	if err != nil {
+		fmt.Println("environment variables parsing error")
+		os.Exit(1)
+	}
+
+	opts := &options{
+		endPointAddr:   defaultEndpoint,
+		pollInterval:   defaultPollInterval,
+		reportInterval: defaultReportInterval,
+	}
+
+	if cfg.endPointAddr != "" {
+		opts.endPointAddr = cfg.endPointAddr
+	}
+	if cfg.pollInterval > 0 {
+		opts.pollInterval = cfg.pollInterval
+	}
+	if cfg.reportInterval > 0 {
+		opts.reportInterval = cfg.reportInterval
+	}
+
 	flag.StringVar(&opts.endPointAddr, "a", defaultEndpoint, "endpoint HTTP-server addr")
-	flag.UintVar(&opts.pollInterval, "p", defaultPollInterval, "PollInterval value")
-	flag.UintVar(&opts.reportInterval, "r", defaultReportInterval, "ReportInterval value")
+	flag.IntVar(&opts.pollInterval, "p", defaultPollInterval, "PollInterval value")
+	flag.IntVar(&opts.reportInterval, "r", defaultReportInterval, "ReportInterval value")
 
 	flag.Parse()
 
-	if opts.pollInterval == 0 || opts.reportInterval == 0 {
-		fmt.Println("Error: poll interval and report interval must be greater than 0")
+	if opts.pollInterval <= 0 || opts.reportInterval <= 0 {
+		fmt.Println("Error: poll interval and report interval must be > 0")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -45,6 +75,8 @@ func flagsInit(opts *options) {
 		flag.Usage()
 		os.Exit(1)
 	}
+
+	return opts
 }
 
 func validateEndpoint(addr string) error {
@@ -75,8 +107,9 @@ func main() {
 	log.Debug("START AGENT>")
 	storage := ms.NewMemStorage()
 
-	var opts options
-	flagsInit(&opts)
+	opts := envAndFlagsInit()
+	log.Debug("Configuration: endPointAddr=%s, pollInterval=%ds, reportInterval=%ds",
+		opts.endPointAddr, opts.pollInterval, opts.reportInterval)
 
 	client := resty.New().
 		SetTimeout(5 * time.Second).
