@@ -58,9 +58,9 @@ func envAndFlagsInit() *options {
 		opts.reportInterval = cfg.reportInterval
 	}
 
-	flag.StringVar(&opts.endPointAddr, "a", defaultEndpoint, "endpoint HTTP-server addr")
-	flag.IntVar(&opts.pollInterval, "p", defaultPollInterval, "PollInterval value")
-	flag.IntVar(&opts.reportInterval, "r", defaultReportInterval, "ReportInterval value")
+	flag.StringVar(&opts.endPointAddr, "a", opts.endPointAddr, "endpoint HTTP-server addr")
+	flag.IntVar(&opts.pollInterval, "p", opts.pollInterval, "PollInterval value")
+	flag.IntVar(&opts.reportInterval, "r", opts.reportInterval, "ReportInterval value")
 
 	flag.Parse()
 

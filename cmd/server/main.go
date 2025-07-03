@@ -44,7 +44,7 @@ func envAndFlagsInit() *options {
 		opts.endPointAddr = cfg.endPointAddr
 	}
 
-	flag.StringVar(&opts.endPointAddr, "a", defaultEndpoint, "endpoint HTTP-server address")
+	flag.StringVar(&opts.endPointAddr, "a", opts.endPointAddr, "endpoint HTTP-server address")
 	flag.Parse()
 
 	if err := validateEndpoint(opts.endPointAddr); err != nil {
