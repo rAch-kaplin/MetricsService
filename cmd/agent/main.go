@@ -29,33 +29,16 @@ type options struct {
 }
 
 type envConfig struct {
-	endPointAddr   string `env:"ADDRESS"`
-	pollInterval   int    `env:"POLL_INTERVAL"`
-	reportInterval int    `env:"REPORT_INTERVAL"`
+	EndPointAddr   string `env:"ADDRESS"`
+	PollInterval   int    `env:"POLL_INTERVAL"`
+	ReportInterval int    `env:"REPORT_INTERVAL"`
 }
 
 func envAndFlagsInit() *options {
-	var cfg envConfig
-	err := env.Parse(&cfg)
-	if err != nil {
-		fmt.Println("environment variables parsing error")
-		os.Exit(1)
-	}
-
 	opts := &options{
 		endPointAddr:   defaultEndpoint,
 		pollInterval:   defaultPollInterval,
 		reportInterval: defaultReportInterval,
-	}
-
-	if cfg.endPointAddr != "" {
-		opts.endPointAddr = cfg.endPointAddr
-	}
-	if cfg.pollInterval > 0 {
-		opts.pollInterval = cfg.pollInterval
-	}
-	if cfg.reportInterval > 0 {
-		opts.reportInterval = cfg.reportInterval
 	}
 
 	flag.StringVar(&opts.endPointAddr, "a", opts.endPointAddr, "endpoint HTTP-server addr")
@@ -63,6 +46,23 @@ func envAndFlagsInit() *options {
 	flag.IntVar(&opts.reportInterval, "r", opts.reportInterval, "ReportInterval value")
 
 	flag.Parse()
+
+	var cfg envConfig
+	err := env.Parse(&cfg)
+	if err != nil {
+		fmt.Println("environment variables parsing error")
+		os.Exit(1)
+	}
+
+	if cfg.EndPointAddr != "" {
+		opts.endPointAddr = cfg.EndPointAddr
+	}
+	if cfg.PollInterval > 0 {
+		opts.pollInterval = cfg.PollInterval
+	}
+	if cfg.ReportInterval > 0 {
+		opts.reportInterval = cfg.ReportInterval
+	}
 
 	if opts.pollInterval <= 0 || opts.reportInterval <= 0 {
 		fmt.Println("Error: poll interval and report interval must be > 0")
@@ -101,7 +101,7 @@ func validateEndpoint(addr string) error {
 }
 
 func main() {
-	log.Init(log.DebugLevel, "logFile.log")
+	log.Init(log.DebugLevel, "logFileAgent.log")
 	defer log.Destroy()
 
 	log.Debug("START AGENT>")

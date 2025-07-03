@@ -25,10 +25,17 @@ type options struct {
 }
 
 type envConfig struct {
-	endPointAddr string `env:"ADDRESS"`
+	EndPointAddr string `env:"ADDRESS"`
 }
 
 func envAndFlagsInit() *options {
+	opts := &options{
+		endPointAddr: defaultEndpoint,
+	}
+
+	flag.StringVar(&opts.endPointAddr, "a", opts.endPointAddr, "endpoint HTTP-server address")
+	flag.Parse()
+
 	var cfg envConfig
 	err := env.Parse(&cfg)
 	if err != nil {
@@ -36,16 +43,9 @@ func envAndFlagsInit() *options {
 		os.Exit(1)
 	}
 
-	opts := &options{
-		endPointAddr: defaultEndpoint,
+	if cfg.EndPointAddr != "" {
+		opts.endPointAddr = cfg.EndPointAddr
 	}
-
-	if cfg.endPointAddr != "" {
-		opts.endPointAddr = cfg.endPointAddr
-	}
-
-	flag.StringVar(&opts.endPointAddr, "a", opts.endPointAddr, "endpoint HTTP-server address")
-	flag.Parse()
 
 	if err := validateEndpoint(opts.endPointAddr); err != nil {
 		fmt.Printf("Error in endpoint address: %v\n", err)
@@ -78,13 +78,15 @@ func validateEndpoint(addr string) error {
 }
 
 func main() {
-	log.Init(log.DebugLevel, "logFile.log")
+	log.Init(log.DebugLevel, "logFileServer.log")
 	defer log.Destroy()
 
 	opts := envAndFlagsInit()
 	log.Debug("Server configuration: Address=%s", opts.endPointAddr)
 
 	log.Debug("START SERVER>")
+	fmt.Printf("Endpoint: [%s]\n", opts.endPointAddr)
+
 
 	storage := ms.NewMemStorage()
 	r := chi.NewRouter()
@@ -98,7 +100,10 @@ func main() {
 	})
 
 	if err := http.ListenAndServe(opts.endPointAddr, r); err != nil {
+		log.Error("HTTP-server didn't start: %v", err)
 		panic(err)
 	}
+	log.Debug("ListenAndServe returned")
+
 	log.Debug("END SERVER<")
 }

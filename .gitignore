@@ -31,5 +31,7 @@ go.work.sum
 .idea
 .vscode
 logFile.log
+logFileServer.log
+logFileAgent.log
 cmd/server/server
 cmd/agent/agent
