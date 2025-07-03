@@ -1,6 +1,11 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -11,9 +16,57 @@ import (
 )
 
 const (
-	pollInterval   = 2 * time.Second
-	reportInterval = 10 * time.Second
+	defaultEndpoint       = "localhost:8080"
+	defaultPollInterval   = 2
+	defaultReportInterval = 10
 )
+
+type options struct {
+	endPointAddr   string
+	pollInterval   uint
+	reportInterval uint
+}
+
+func flagsInit(opts *options) {
+	flag.StringVar(&opts.endPointAddr, "a", defaultEndpoint, "endpoint HTTP-server addr")
+	flag.UintVar(&opts.pollInterval, "p", defaultPollInterval, "PollInterval value")
+	flag.UintVar(&opts.reportInterval, "r", defaultReportInterval, "ReportInterval value")
+
+	flag.Parse()
+
+	if opts.pollInterval == 0 || opts.reportInterval == 0 {
+		fmt.Println("Error: poll interval and report interval must be greater than 0")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	if err := validateEndpoint(opts.endPointAddr); err != nil {
+		fmt.Printf("Error in endpoint address: %v\n", err)
+		flag.Usage()
+		os.Exit(1)
+	}
+}
+
+func validateEndpoint(addr string) error {
+	parts := strings.Split(addr, ":")
+
+	if len(parts) != 2 {
+		return fmt.Errorf("address must be in format 'host:port'")
+	}
+
+	if parts[0] == "" {
+		return fmt.Errorf("host cannot be empty")
+	}
+
+	port, err := strconv.Atoi(parts[1])
+	if err != nil || port <= 0 {
+		fmt.Printf("Error: Port must be >0 number\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	return nil
+}
 
 func main() {
 	log.Init(log.DebugLevel, "logFile.log")
@@ -22,10 +75,13 @@ func main() {
 	log.Debug("START AGENT>")
 	storage := ms.NewMemStorage()
 
+	var opts options
+	flagsInit(&opts)
+
 	client := resty.New().SetTimeout(5 * time.Second)
 
-	go agent.CollectionLoop(storage, pollInterval)
-	go agent.ReportLoop(client, storage, reportInterval)
+	go agent.CollectionLoop(storage, time.Duration(opts.pollInterval)*time.Second)
+	go agent.ReportLoop(client, storage, time.Duration(opts.reportInterval)*time.Second)
 
 	log.Debug("END AGENT<")
 	select {}
