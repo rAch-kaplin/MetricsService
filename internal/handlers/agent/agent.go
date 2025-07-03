@@ -188,20 +188,20 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 	storage.UpdateMetric(mtr.NewGauge("RandomValue", rand.Float64()))
 }
 
-func sendAllMetrics(client *resty.Client, endPointAddr string, storage *ms.MemStorage) {
+func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 	gauges, counters := storage.GetAllMetrics()
 
 	for name, value := range gauges {
-		sendMetric(client, endPointAddr, mtr.GaugeType, name, value)
+		sendMetric(client, mtr.GaugeType, name, value)
 	}
 
 	for name, value := range counters {
-		sendMetric(client, endPointAddr, mtr.CounterType, name, value)
+		sendMetric(client, mtr.CounterType, name, value)
 	}
 }
 
-func sendMetric(client *resty.Client, endPointAddr string, mType string, mName string, mValue interface{}) {
-	url := fmt.Sprintf("%s/update/%s/%s/%v", endPointAddr, mType, mName, mValue)
+func sendMetric(client *resty.Client, mType string, mName string, mValue interface{}) {
+	url := fmt.Sprintf("update/%s/%s/%v", mType, mName, mValue)
 
 	res, err := client.R().
 		SetHeader("Content-Type", "text/plain").
@@ -227,10 +227,10 @@ func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
 	}
 }
 
-func ReportLoop(client *resty.Client, endPointAddr string, storage *ms.MemStorage, interval time.Duration) {
+func ReportLoop(client *resty.Client, storage *ms.MemStorage, interval time.Duration) {
 	log.Debug("reportLoop ...")
 	for {
 		time.Sleep(interval)
-		sendAllMetrics(client, endPointAddr, storage)
+		sendAllMetrics(client, storage)
 	}
 }
