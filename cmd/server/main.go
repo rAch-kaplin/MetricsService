@@ -11,7 +11,9 @@ import (
 )
 
 func main() {
-	log.Init(log.DebugLevel, "logFileServer.log")
+	if err := log.Init(log.DebugLevel, "logFileServer.log"); err != nil {
+		fmt.Errorf("Error initializing the log file: %v", err)
+	}
 	defer log.Destroy()
 
 	if err := rootCmd.Execute(); err != nil {

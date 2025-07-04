@@ -180,12 +180,17 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 		}
 
 		if err := storage.UpdateMetric(metric); err != nil {
-			log.Error("ERROR!")
+			log.Error("Failed to update metric %s: %v", stat.Name, err)
 		}
 	}
 
-	storage.UpdateMetric(mtr.NewCounter("PollCount", 1))
-	storage.UpdateMetric(mtr.NewGauge("RandomValue", rand.Float64()))
+	if err := storage.UpdateMetric(mtr.NewCounter("PollCount", 1)); err != nil {
+		log.Error("Failed to update PollCount metric: %v", err)
+	}
+
+	if err := storage.UpdateMetric(mtr.NewGauge("RandomValue", rand.Float64())); err != nil {
+		log.Error("Failed to update RandomValue metric: %v", err)
+	}
 }
 
 func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {

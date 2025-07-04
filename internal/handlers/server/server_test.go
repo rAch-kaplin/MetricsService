@@ -8,6 +8,7 @@ import (
 
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
 func TestUpdateMetric(t *testing.T) {
@@ -81,8 +82,13 @@ func TestUpdateMetric(t *testing.T) {
 func TestGetMetric(t *testing.T) {
 	storage := ms.NewMemStorage()
 
-	storage.UpdateMetric(mtr.NewGauge("cpu_usage", 75.5))
-	storage.UpdateMetric(mtr.NewCounter("requests_total", 100))
+	if err := storage.UpdateMetric(mtr.NewGauge("cpu_usage", 75.5)); err != nil {
+		log.Error("Failed to update metric cpu_usage: %v", err)
+	}
+
+	if err := storage.UpdateMetric(mtr.NewCounter("requests_total", 100)); err != nil {
+		log.Error("Failed to update metric requests_total: %v", err)
+	}
 	router := NewRouter(storage)
 
 	tests := []struct {

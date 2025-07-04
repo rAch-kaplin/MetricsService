@@ -86,7 +86,12 @@ func GetMetric(storage ms.Collector) http.HandlerFunc {
 
 		res.Header().Set("Content-Type", "text/plain")
 		res.WriteHeader(http.StatusOK)
-		res.Write([]byte(valueStr))
+
+		_, err := res.Write([]byte(valueStr))
+		if err != nil {
+			log.Error("Failed to write response: %v", err)
+
+		}
 
 		log.Debug("the metric has been send")
 	}

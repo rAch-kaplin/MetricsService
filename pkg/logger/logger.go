@@ -64,7 +64,9 @@ func Init(level LogLevel, logFileName string) error {
 func Destroy() {
 	log := getLogger()
 	if file, ok := log.out.(*os.File); ok {
-		file.Close()
+		if err := file.Close(); err != nil {
+			fmt.Errorf("Failed to close log file: %v", err)
+		}
 	}
 }
 
