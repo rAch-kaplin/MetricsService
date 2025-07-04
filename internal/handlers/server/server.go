@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
@@ -16,6 +17,20 @@ type MetricTable struct {
 	Name  string
 	Type  string
 	Value string
+}
+
+func NewRouter(storage ms.Collector) http.Handler {
+	r := chi.NewRouter()
+
+	r.Route("/", func(r chi.Router) {
+		r.Get("/", GetAllMetrics(storage))
+		r.Route("/", func(r chi.Router) {
+			r.Get("/value/{mType}/{mName}", GetMetric(storage))
+			r.Post("/update/{mType}/{mName}/{mValue}", UpdateMetric(storage))
+		})
+	})
+
+	return r
 }
 
 // FIXME other function name

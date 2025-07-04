@@ -6,27 +6,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 )
 
-func setupTestRouter(storage ms.Collector) http.Handler {
-	r := chi.NewRouter()
-
-	r.Route("/", func(r chi.Router) {
-		r.Get("/", GetAllMetrics(storage))
-		r.Route("/", func(r chi.Router) {
-			r.Get("/value/{mType}/{mName}", GetMetric(storage))
-			r.Post("/update/{mType}/{mName}/{mValue}", UpdateMetric(storage))
-		})
-	})
-	return r
-}
-
 func TestUpdateMetric(t *testing.T) {
 	storage := ms.NewMemStorage()
-	router := setupTestRouter(storage)
+	router := NewRouter(storage)
 
 	tests := []struct {
 		name       string
@@ -97,7 +83,7 @@ func TestGetMetric(t *testing.T) {
 
 	storage.UpdateMetric(mtr.NewGauge("cpu_usage", 75.5))
 	storage.UpdateMetric(mtr.NewCounter("requests_total", 100))
-	router := setupTestRouter(storage)
+	router := NewRouter(storage)
 
 	tests := []struct {
 		name       string
