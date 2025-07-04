@@ -65,7 +65,7 @@ func Destroy() {
 	log := getLogger()
 	if file, ok := log.out.(*os.File); ok {
 		if err := file.Close(); err != nil {
-			fmt.Errorf("Failed to close log file: %v", err)
+			fmt.Printf("Failed to close log file: %v", err)
 		}
 	}
 }
@@ -83,7 +83,10 @@ func (log *logger) log(level LogLevel, format string, args ...interface{}) {
 	levelStr := levelMap[level]
 	msg := fmt.Sprintf(format, args...)
 
-	fmt.Fprintf(log.out, "[%s]%s[%s:%d]: %s \n", time, levelStr, filepath.Base(file), line, msg)
+	_, err := fmt.Fprintf(log.out, "[%s]%s[%s:%d]: %s \n", time, levelStr, filepath.Base(file), line, msg)
+	if err != nil {
+		fmt.Printf("failed to write log message: %v\n", err)
+	}
 }
 
 func Debug(format string, args ...interface{}) {

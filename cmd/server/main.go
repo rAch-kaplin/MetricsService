@@ -12,7 +12,7 @@ import (
 
 func main() {
 	if err := log.Init(log.DebugLevel, "logFileServer.log"); err != nil {
-		fmt.Errorf("Error initializing the log file: %v", err)
+		fmt.Printf("Error initializing the log file: %v", err)
 	}
 	defer log.Destroy()
 
