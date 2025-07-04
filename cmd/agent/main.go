@@ -2,6 +2,7 @@ package main
 
 import (
 	"time"
+	"os"
 
 	"github.com/go-resty/resty/v2"
 
@@ -14,10 +15,13 @@ func main() {
 	log.Init(log.DebugLevel, "logFileAgent.log")
 	defer log.Destroy()
 
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
+
 	log.Debug("START AGENT>")
 	storage := ms.NewMemStorage()
 
-	opts := envAndFlagsInit()
 	log.Debug("Configuration: endPointAddr=%s, pollInterval=%ds, reportInterval=%ds",
 		opts.endPointAddr, opts.pollInterval, opts.reportInterval)
 

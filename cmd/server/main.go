@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 
@@ -15,7 +16,9 @@ func main() {
 	log.Init(log.DebugLevel, "logFileServer.log")
 	defer log.Destroy()
 
-	opts := envAndFlagsInit()
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 	log.Debug("Server configuration: Address=%s", opts.endPointAddr)
 
 	log.Debug("START SERVER>")

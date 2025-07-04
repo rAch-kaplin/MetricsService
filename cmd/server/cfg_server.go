@@ -1,12 +1,11 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/caarlos0/env/v6"
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -21,30 +20,34 @@ type envConfig struct {
 	EndPointAddr string `env:"ADDRESS"`
 }
 
-func envAndFlagsInit() *options {
-	opts := &options{
-		endPointAddr: defaultEndpoint,
-	}
+var opts = &options{}
 
-	flag.StringVar(&opts.endPointAddr, "a", opts.endPointAddr, "endpoint HTTP-server address")
-	flag.Parse()
+var rootCmd = &cobra.Command{
+	Use:   "server",
+	Short: "MetricService",
+	Long:  "MetricService",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var cfg envConfig
+		err := env.Parse(&cfg)
+		if err != nil {
+			return fmt.Errorf("poll and report intervals must be > 0")
+		}
 
-	var cfg envConfig
-	err := env.Parse(&cfg)
-	if err != nil {
-		fmt.Println("environment variable parsing error")
-		os.Exit(1)
-	}
+		if cfg.EndPointAddr != "" {
+			opts.endPointAddr = cfg.EndPointAddr
+		}
 
-	if cfg.EndPointAddr != "" {
-		opts.endPointAddr = cfg.EndPointAddr
-	}
+		if _, _, err := net.SplitHostPort(opts.endPointAddr); err != nil {
+			return fmt.Errorf("invalid address %s: %w", opts.endPointAddr, err)
+		}
 
-	if _, _, err := net.SplitHostPort(opts.endPointAddr); err != nil {
-		fmt.Errorf("invalid address %s: %w", opts.endPointAddr, err)
-		flag.Usage()
-		os.Exit(1)
-	}
+		return nil
+	},
+}
 
-	return opts
+func init() {
+	opts.endPointAddr = defaultEndpoint
+
+	rootCmd.Flags().StringVarP(&opts.endPointAddr, "a", "a", opts.endPointAddr, "endpoint HTTP-server addr")
 }
