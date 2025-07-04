@@ -11,7 +11,7 @@ import (
 
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
-	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
+	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
 type MemRuntimeStat struct {
@@ -171,9 +171,9 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 				metric = mtr.NewGauge(stat.Name, v)
 			}
 		case uint32:
-            if stat.Type == mtr.GaugeType {
-                metric = mtr.NewGauge(stat.Name, float64(v))
-            }
+			if stat.Type == mtr.GaugeType {
+				metric = mtr.NewGauge(stat.Name, float64(v))
+			}
 		default:
 			log.Error("ERROR: Unknown type for metric %s: %T", stat.Name, value)
 			continue
@@ -201,11 +201,14 @@ func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 }
 
 func sendMetric(client *resty.Client, mType string, mName string, mValue interface{}) {
-	url := fmt.Sprintf("update/%s/%s/%v", mType, mName, mValue)
-
 	res, err := client.R().
 		SetHeader("Content-Type", "text/plain").
-		Post(url)
+		SetPathParams(map[string]string{
+			"mType":  mType,
+			"mName":  mName,
+			"mValue": fmt.Sprintf("%v", mValue),
+		}).
+		Post("update/{mType}/{mName}/{mValue}")
 
 	if err != nil {
 		log.Error("Error creating a request for %s: %v", mName, err)

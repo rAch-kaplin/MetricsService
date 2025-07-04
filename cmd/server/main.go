@@ -1,81 +1,15 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"net/http"
-	"os"
-	"strconv"
-	"strings"
 
-	"github.com/caarlos0/env/v6"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
-	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
+	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
-
-const (
-	defaultEndpoint = "localhost:8080"
-)
-
-type options struct {
-	endPointAddr string
-}
-
-type envConfig struct {
-	EndPointAddr string `env:"ADDRESS"`
-}
-
-func envAndFlagsInit() *options {
-	opts := &options{
-		endPointAddr: defaultEndpoint,
-	}
-
-	flag.StringVar(&opts.endPointAddr, "a", opts.endPointAddr, "endpoint HTTP-server address")
-	flag.Parse()
-
-	var cfg envConfig
-	err := env.Parse(&cfg)
-	if err != nil {
-		fmt.Println("environment variable parsing error")
-		os.Exit(1)
-	}
-
-	if cfg.EndPointAddr != "" {
-		opts.endPointAddr = cfg.EndPointAddr
-	}
-
-	if err := validateEndpoint(opts.endPointAddr); err != nil {
-		fmt.Printf("Error in endpoint address: %v\n", err)
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	return opts
-}
-
-func validateEndpoint(addr string) error {
-	parts := strings.Split(addr, ":")
-
-	if len(parts) != 2 {
-		return fmt.Errorf("address must be in format 'host:port'")
-	}
-
-	if parts[0] == "" {
-		return fmt.Errorf("host cannot be empty")
-	}
-
-	port, err := strconv.Atoi(parts[1])
-	if err != nil || port <= 0 {
-		fmt.Printf("Error: Port must be >0 number\n")
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	return nil
-}
 
 func main() {
 	log.Init(log.DebugLevel, "logFileServer.log")
@@ -86,7 +20,6 @@ func main() {
 
 	log.Debug("START SERVER>")
 	fmt.Printf("Endpoint: [%s]\n", opts.endPointAddr)
-
 
 	storage := ms.NewMemStorage()
 	r := chi.NewRouter()

@@ -23,6 +23,12 @@ agent:
 	@go build -o $(AGENT_FULL_PATH) $(AGENT_SRC_DIR)
 	@echo "Built $(AGENT_FULL_PATH)"
 
+test:
+	@go test ./... -v
+
+lint:
+	@golangci-lint run
+
 clean:
 	@rm -f $(SERVER_FULL_PATH) $(AGENT_FULL_PATH)
 	@echo "Cleaned."

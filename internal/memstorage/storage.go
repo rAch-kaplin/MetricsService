@@ -2,6 +2,7 @@ package memstorage
 
 import (
 	"sync"
+	"maps"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 )
@@ -91,15 +92,8 @@ func (ms *MemStorage) GetAllMetrics() (map[string]float64, map[string]int64) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
-	gaugesCopy := make(map[string]float64, len(ms.Gauges))
-	for name, value := range ms.Gauges {
-		gaugesCopy[name] = value
-	}
-
-	countersCopy := make(map[string]int64, len(ms.Counters))
-	for name, value := range ms.Counters {
-		countersCopy[name] = value
-	}
+	gaugesCopy := maps.Clone(ms.Gauges)
+	countersCopy := maps.Clone(ms.Counters)
 
 	return gaugesCopy, countersCopy
 }
