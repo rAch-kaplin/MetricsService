@@ -39,7 +39,12 @@ var rootCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Logger init error: %v\n", err)
 			os.Exit(1)
 		}
-		defer logFile.Close()
+		
+		defer func() {
+			if err := logFile.Close(); err != nil {
+				log.Error().Err(err).Msg("Failed to close log file")
+			}
+		}()
 
 		var cfg envConfig
 		err = env.Parse(&cfg)
