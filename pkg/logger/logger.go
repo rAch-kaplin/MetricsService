@@ -2,101 +2,67 @@ package logger
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"runtime"
-	"sync"
-	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-type LogLevel int
+var logger zerolog.Logger
 
-const (
-	DebugLevel LogLevel = iota
-	InfoLevel
-	ErrorLevel
-)
-
-var levelMap = map[LogLevel]string{
-	DebugLevel: "[DEBUG]",
-	InfoLevel:  "[INFO]",
-	ErrorLevel: "[ERROR]",
-}
-
-type logger struct {
-	level LogLevel
-	out   io.Writer
-}
-
-var (
-	instance *logger
-	once     sync.Once
-)
-
-func getLogger() *logger {
-	once.Do(func() {
-		instance = &logger{
-			level: DebugLevel,
-			out:   os.Stdout,
-		}
-	})
-	return instance
-}
-
-func Init(level LogLevel, logFileName string) error {
-	log := getLogger()
-	log.level = level
-
-	if logFileName != "" {
-		file, err := os.Create(logFileName)
-		if err != nil {
-			return fmt.Errorf("failed to open log file %s: %w", logFileName, err)
-		}
-		log.out = file
-	} else {
-		log.out = os.Stdout
-	}
-
-	return nil
-}
-
-func Destroy() {
-	log := getLogger()
-	if file, ok := log.out.(*os.File); ok {
-		if err := file.Close(); err != nil {
-			fmt.Printf("Failed to close log file: %v", err)
-		}
-	}
-}
-
-func (log *logger) log(level LogLevel, format string, args ...interface{}) {
-	if log.level > level {
-		return
-	}
-
-	_, file, line, ok := runtime.Caller(2)
-	if !ok {
-		file, line = "---", 0
-	}
-	time := time.Now().Format("2006-01-02 15:04:05")
-	levelStr := levelMap[level]
-	msg := fmt.Sprintf(format, args...)
-
-	_, err := fmt.Fprintf(log.out, "[%s]%s[%s:%d]: %s \n", time, levelStr, filepath.Base(file), line, msg)
+func InitLogger(logFilePath string) (*os.File, error) {
+	file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		fmt.Printf("failed to write log message: %v\n", err)
+		return nil, fmt.Errorf("failed to open log file %s: %w", logFilePath, err)
 	}
+
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	zerolog.TimeFieldFormat = "2006-01-02 15:04:05"
+
+	zerolog.CallerMarshalFunc = func(pc uintptr, file string, line int) string {
+		return fmt.Sprintf("%s:%d", filepath.Base(file), line)
+	}
+
+	logger = zerolog.New(file).
+		With().
+		Timestamp().
+		CallerWithSkipFrameCount(2).
+		Logger()
+
+	log.Logger = logger
+
+	return file, nil
 }
 
-func Debug(format string, args ...interface{}) {
-	getLogger().log(DebugLevel, format, args...)
+func Trace() *zerolog.Event {
+	return logger.Trace()
 }
 
-func Info(format string, args ...interface{}) {
-	getLogger().log(InfoLevel, format, args...)
+func Debug() *zerolog.Event {
+	return logger.Debug()
 }
 
-func Error(format string, args ...interface{}) {
-	getLogger().log(ErrorLevel, format, args...)
+func Info() *zerolog.Event {
+	return logger.Info()
+}
+
+func Warn() *zerolog.Event {
+	return logger.Warn()
+}
+
+func Error() *zerolog.Event {
+	return logger.Error()
+}
+
+func Fatal() *zerolog.Event {
+	return logger.Fatal()
+}
+
+func Panic() *zerolog.Event {
+	return logger.Panic()
+}
+
+func WithLevel(level zerolog.Level) *zerolog.Event {
+	return logger.WithLevel(level)
 }

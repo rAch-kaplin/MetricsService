@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
@@ -175,21 +175,21 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 				metric = mtr.NewGauge(stat.Name, float64(v))
 			}
 		default:
-			log.Error("ERROR: Unknown type for metric %s: %T", stat.Name, value)
+			log.Error().Msgf("Unknown type for metric %s: %T", stat.Name, value)
 			continue
 		}
 
 		if err := storage.UpdateMetric(metric); err != nil {
-			log.Error("Failed to update metric %s: %v", stat.Name, err)
+			log.Error().Msgf("Failed to update metric %s: %v", stat.Name, err)
 		}
 	}
 
 	if err := storage.UpdateMetric(mtr.NewCounter("PollCount", 1)); err != nil {
-		log.Error("Failed to update PollCount metric: %v", err)
+		log.Error().Msgf("Failed to update PollCount metric: %v", err)
 	}
 
 	if err := storage.UpdateMetric(mtr.NewGauge("RandomValue", rand.Float64())); err != nil {
-		log.Error("Failed to update RandomValue metric: %v", err)
+		log.Error().Msgf("Failed to update RandomValue metric: %v", err)
 	}
 }
 
@@ -216,19 +216,19 @@ func sendMetric(client *resty.Client, mType string, mName string, mValue interfa
 		Post("update/{mType}/{mName}/{mValue}")
 
 	if err != nil {
-		log.Error("Error creating a request for %s: %v", mName, err)
+		log.Error().Msgf("Error creating a request for %s: %v", mName, err)
 		return
 	}
 
 	if res.StatusCode() != http.StatusOK {
-		log.Error("Server returned non-OK status for %s/%s: %d %s", mType, mName, res.StatusCode(), res.String())
+		log.Error().Msgf("Server returned non-OK status for %s/%s: %d %s", mType, mName, res.StatusCode(), res.String())
 	} else {
-		log.Debug("Metric %s/%s sent successfully. Status: %d", mType, mName, res.StatusCode())
+		log.Debug().Msgf("Metric %s/%s sent successfully. Status: %d", mType, mName, res.StatusCode())
 	}
 }
 
 func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
-	log.Debug("collectionLoop ...")
+	log.Debug().Msg("collectionLoop ...")
 	for {
 		UpdateAllMetrics(storage)
 		time.Sleep(interval)
@@ -236,7 +236,7 @@ func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
 }
 
 func ReportLoop(client *resty.Client, storage *ms.MemStorage, interval time.Duration) {
-	log.Debug("reportLoop ...")
+	log.Debug().Msg("reportLoop ...")
 	for {
 		time.Sleep(interval)
 		sendAllMetrics(client, storage)

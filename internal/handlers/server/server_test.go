@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
@@ -83,11 +83,11 @@ func TestGetMetric(t *testing.T) {
 	storage := ms.NewMemStorage()
 
 	if err := storage.UpdateMetric(mtr.NewGauge("cpu_usage", 75.5)); err != nil {
-		log.Error("Failed to update metric cpu_usage: %v", err)
+		log.Error().Msgf("Failed to update metric cpu_usage: %v", err)
 	}
 
 	if err := storage.UpdateMetric(mtr.NewCounter("requests_total", 100)); err != nil {
-		log.Error("Failed to update metric requests_total: %v", err)
+		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 	router := NewRouter(storage)
 
