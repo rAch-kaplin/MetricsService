@@ -35,10 +35,10 @@ func NewRouter(storage ms.Collector) http.Handler {
 	return r
 }
 
-// FIXME other function name
-func NewCounter(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
+func newCounter(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
 	val, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
+		log.Error().Err(err).Str("value", value).Msg("invalid counter metric value")
 		http.Error(res, "invalid value metric", http.StatusBadRequest)
 		return nil, err
 	}
@@ -46,10 +46,10 @@ func NewCounter(res http.ResponseWriter, name, value string) (mtr.Metric, error)
 	return mtr.NewCounter(name, val), nil
 }
 
-// FIXME other function name
-func NewGauge(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
+func newGauge(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
 	val, err := strconv.ParseFloat(value, 64)
 	if err != nil {
+		log.Error().Err(err).Str("value", value).Msg("invalid gauge metric value")
 		http.Error(res, "invalid value metric", http.StatusBadRequest)
 		return nil, err
 	}
@@ -57,7 +57,8 @@ func NewGauge(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
 	return mtr.NewGauge(name, val), nil
 }
 
-func HandleUnknownMetric(res http.ResponseWriter) {
+func HandleUnknownMetric(res http.ResponseWriter, mType string) {
+	log.Error().Str("metricType", mType).Msg("unknown metric type")
 	http.Error(res, "unknown type metric!", http.StatusBadRequest)
 }
 
@@ -78,8 +79,8 @@ func GetMetric(storage ms.Collector) http.HandlerFunc {
 		case int64:
 			valueStr = strconv.FormatInt(v, 10)
 		default:
-			http.Error(res, "an unexpected type of metric", http.StatusInternalServerError)
-			return //FIXME fix this case
+			log.Error().Msg("unexpected type of metric")
+			http.Error(res, "unexpected type of metric", http.StatusInternalServerError)
 		}
 
 		res.Header().Set("Content-Type", "text/plain")
@@ -146,7 +147,7 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 
 		template, err := template.New("Metrics").Parse(htmlTemplate)
 		if err != nil {
-			log.Error().Msgf("couldn't make it out HTML template: %v", err)
+			log.Error().Err(err).Msg("failed to parse HTML template")
 			http.Error(res, "Internal server error, failed html-template", http.StatusInternalServerError)
 			return
 		}
@@ -154,7 +155,7 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 		res.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 		if err := template.Execute(res, metricsToTable); err != nil {
-			log.Error().Msgf("failed complete template: %v", err)
+			log.Error().Err(err).Msg("failed to execute HTML template")
 		}
 
 		res.WriteHeader(http.StatusOK)
@@ -178,20 +179,20 @@ func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 
 		switch mType {
 		case mtr.GaugeType:
-			metric, err = NewGauge(res, mName, mValue)
+			metric, err = newGauge(res, mName, mValue)
 		case mtr.CounterType:
-			metric, err = NewCounter(res, mName, mValue)
+			metric, err = newCounter(res, mName, mValue)
 		default:
-			HandleUnknownMetric(res)
+			HandleUnknownMetric(res, mType)
 			return
 		}
 
 		if err != nil {
-			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		if err := storage.UpdateMetric(metric); err != nil {
+			log.Error().Err(err).Msg("failed to update metric in storage")
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
