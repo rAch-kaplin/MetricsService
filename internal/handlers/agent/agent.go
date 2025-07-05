@@ -175,21 +175,33 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 				metric = mtr.NewGauge(stat.Name, float64(v))
 			}
 		default:
-			log.Error().Msgf("Unknown type for metric %s: %T", stat.Name, value)
+			log.Error().
+				Str("metric", stat.Name).
+				Str("type", fmt.Sprintf("%T", value)).
+				Msg("Unknown type for metric")
 			continue
 		}
 
 		if err := storage.UpdateMetric(metric); err != nil {
-			log.Error().Msgf("Failed to update metric %s: %v", stat.Name, err)
+			log.Error().
+				Err(err).
+				Str("metric", stat.Name).
+				Msg("Failed to update metric")
 		}
 	}
 
 	if err := storage.UpdateMetric(mtr.NewCounter("PollCount", 1)); err != nil {
-		log.Error().Msgf("Failed to update PollCount metric: %v", err)
+		log.Error().
+			Err(err).
+			Str("metric", "PollCount").
+			Msg("Failed to update PollCount")
 	}
 
 	if err := storage.UpdateMetric(mtr.NewGauge("RandomValue", rand.Float64())); err != nil {
-		log.Error().Msgf("Failed to update RandomValue metric: %v", err)
+		log.Error().
+			Err(err).
+			Str("metric", "RandomValue").
+			Msg("Failed to update RandomValue")
 	}
 }
 
@@ -216,14 +228,26 @@ func sendMetric(client *resty.Client, mType string, mName string, mValue interfa
 		Post("update/{mType}/{mName}/{mValue}")
 
 	if err != nil {
-		log.Error().Msgf("Error creating a request for %s: %v", mName, err)
+		log.Error().
+			Err(err).
+			Str("metric", mName).
+			Msg("Error sending request")
 		return
 	}
 
 	if res.StatusCode() != http.StatusOK {
-		log.Error().Msgf("Server returned non-OK status for %s/%s: %d %s", mType, mName, res.StatusCode(), res.String())
+		log.Error().
+			Str("type", mType).
+			Str("name", mName).
+			Int("status", res.StatusCode()).
+			Str("response", res.String()).
+			Msg("Non-OK response from server")
 	} else {
-		log.Debug().Msgf("Metric %s/%s sent successfully. Status: %d", mType, mName, res.StatusCode())
+		log.Debug().
+			Str("type", mType).
+			Str("name", mName).
+			Int("status", res.StatusCode()).
+			Msg("Metric sent successfully")
 	}
 }
 
