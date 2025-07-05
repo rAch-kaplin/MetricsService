@@ -80,7 +80,10 @@ func sendMetric(client *resty.Client, mType string, mName string, mValue interfa
 		Post("update/{mType}/{mName}/{mValue}")
 
 	if err != nil {
-		log.Error().Msgf("Error creating a request for %s: %v", mName, err)
+		log.Error().
+			Err(err).
+			Str("metric", mName).
+			Msg("Error sending request")
 		return
 	}
 
