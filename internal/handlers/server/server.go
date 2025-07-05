@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
@@ -61,11 +61,11 @@ func HandleUnknownMetric(res http.ResponseWriter) {
 
 func GetMetric(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		log.Debug("Incoming GET request: %s %s", req.Method, req.URL.Path)
+		log.Debug().Msgf("Incoming GET request: %s %s", req.Method, req.URL.Path)
 
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
-		log.Debug("Incoming request for metric: Type=%s, Name=%s", mType, mName)
+		log.Debug().Msgf("Incoming request for metric: Type=%s, Name=%s", mType, mName)
 
 		value, found := storage.GetMetric(mType, mName)
 		if !found {
@@ -89,11 +89,11 @@ func GetMetric(storage ms.Collector) http.HandlerFunc {
 
 		_, err := res.Write([]byte(valueStr))
 		if err != nil {
-			log.Error("Failed to write response: %v", err)
+			log.Error().Msgf("Failed to write response: %v", err)
 
 		}
 
-		log.Debug("the metric has been send")
+		log.Debug().Msg("the metric has been send")
 	}
 }
 
@@ -150,7 +150,7 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 
 		template, err := template.New("Metrics").Parse(htmlTemplate)
 		if err != nil {
-			log.Error("couldn't make it out HTML template: %v", err)
+			log.Error().Msgf("couldn't make it out HTML template: %v", err)
 			http.Error(res, "Internal server error, failed html-template", http.StatusInternalServerError)
 			return
 		}
@@ -158,25 +158,25 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 		res.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 		if err := template.Execute(res, metricsToTable); err != nil {
-			log.Error("failed complete template: %v", err)
+			log.Error().Msgf("failed complete template: %v", err)
 		}
 
-		log.Debug("the metrics has been send")
+		log.Debug().Msg("the metrics has been send")
 		res.WriteHeader(http.StatusOK)
 	}
 }
 
 func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		log.Debug("Incoming POST request: %s %s", req.Method, req.URL.Path)
+		log.Debug().Msgf("Incoming POST request: %s %s", req.Method, req.URL.Path)
 
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
 		mValue := chi.URLParam(req, "mValue")
-		log.Debug("Parsed metric: type=%s, name=%s, value=%s", mType, mName, mValue)
+		log.Debug().Msgf("Parsed metric: type=%s, name=%s, value=%s", mType, mName, mValue)
 
 		if mName == "" {
-			log.Error("the metric name is not specified")
+			log.Error().Msgf("the metric name is not specified")
 			http.Error(res, "the metric name is not specified", http.StatusBadRequest)
 			return
 		}
@@ -204,7 +204,7 @@ func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 			return
 		}
 
-		log.Info("Metric updated successfully: %s %s = %s", mType, mName, mValue)
+		log.Info().Msgf("Metric updated successfully: %s %s = %s", mType, mName, mValue)
 		res.WriteHeader(http.StatusOK)
 	}
 }
