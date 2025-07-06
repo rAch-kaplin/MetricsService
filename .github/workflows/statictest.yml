@@ -17,7 +17,7 @@ jobs:
       - name: Download statictest binary
         uses: robinraju/release-downloader@v1.8
         with:
-          repository: mipt-golang-course/go-autotests
+          repository: rAch-kaplin/go-autotests.git
           latest: true
           fileName: statictest
           out-file-path: .tools
