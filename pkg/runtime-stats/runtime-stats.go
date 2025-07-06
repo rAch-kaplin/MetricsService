@@ -9,138 +9,138 @@ import (
 type MemRuntimeStat struct {
 	Name string
 	Type string
-	Get  func(m *runtime.MemStats) float64
+	Get  func(m *runtime.MemStats) any
 }
 
 var MemRuntimeStats []MemRuntimeStat = []MemRuntimeStat{
 	{
 		Name: "Alloc",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.Alloc) },
+		Get:  func(m *runtime.MemStats) any { return m.Alloc },
 	},
 	{
 		Name: "BuckHashSys",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.BuckHashSys) },
+		Get:  func(m *runtime.MemStats) any { return m.BuckHashSys },
 	},
 	{
 		Name: "Frees",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.Frees) },
+		Get:  func(m *runtime.MemStats) any { return m.Frees },
 	},
 	{
 		Name: "GCCPUFraction",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.GCCPUFraction) },
+		Get:  func(m *runtime.MemStats) any { return m.GCCPUFraction },
 	},
 	{
 		Name: "HeapAlloc",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.HeapAlloc) },
+		Get:  func(m *runtime.MemStats) any { return m.HeapAlloc },
 	},
 	{
 		Name: "HeapIdle",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.HeapIdle) },
+		Get:  func(m *runtime.MemStats) any { return m.HeapIdle },
 	},
 	{
 		Name: "HeapInuse",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.HeapInuse) },
+		Get:  func(m *runtime.MemStats) any { return m.HeapInuse },
 	},
 	{
 		Name: "HeapObjects",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.HeapObjects) },
+		Get:  func(m *runtime.MemStats) any { return m.HeapObjects },
 	},
 	{
 		Name: "HeapReleased",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.HeapReleased) },
+		Get:  func(m *runtime.MemStats) any { return m.HeapReleased },
 	},
 	{
 		Name: "HeapSys",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.HeapSys) },
+		Get:  func(m *runtime.MemStats) any { return m.HeapSys },
 	},
 	{
 		Name: "LastGC",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.LastGC) },
+		Get:  func(m *runtime.MemStats) any { return m.LastGC },
 	},
 	{
 		Name: "Lookups",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.Lookups) },
+		Get:  func(m *runtime.MemStats) any { return m.Lookups },
 	},
 	{
 		Name: "MCacheInuse",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.MCacheInuse) },
+		Get:  func(m *runtime.MemStats) any { return m.MCacheInuse },
 	},
 	{
 		Name: "MCacheSys",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.MCacheSys) },
+		Get:  func(m *runtime.MemStats) any { return m.MCacheSys },
 	},
 	{
 		Name: "MSpanInuse",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.MSpanInuse) },
+		Get:  func(m *runtime.MemStats) any { return m.MSpanInuse },
 	},
 	{
 		Name: "MSpanSys",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.MSpanSys) },
+		Get:  func(m *runtime.MemStats) any { return m.MSpanSys },
 	},
 	{
 		Name: "Mallocs",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.Mallocs) },
+		Get:  func(m *runtime.MemStats) any { return m.Mallocs },
 	},
 	{
 		Name: "NextGC",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.NextGC) },
+		Get:  func(m *runtime.MemStats) any { return m.NextGC },
 	},
 	{
 		Name: "NumForcedGC",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.NumForcedGC) },
+		Get:  func(m *runtime.MemStats) any { return m.NumForcedGC },
 	},
 	{
 		Name: "NumGC",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.NumGC) },
+		Get:  func(m *runtime.MemStats) any { return m.NumGC },
 	},
 	{
 		Name: "OtherSys",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.OtherSys) },
+		Get:  func(m *runtime.MemStats) any { return m.OtherSys },
 	},
 	{
 		Name: "PauseTotalNs",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.PauseTotalNs) },
+		Get:  func(m *runtime.MemStats) any { return m.PauseTotalNs },
 	},
 	{
 		Name: "StackInuse",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.StackInuse) },
+		Get:  func(m *runtime.MemStats) any { return m.StackInuse },
 	},
 	{
 		Name: "StackSys",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.StackSys) },
+		Get:  func(m *runtime.MemStats) any { return m.StackSys },
 	},
 	{
 		Name: "Sys",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.Sys) },
+		Get:  func(m *runtime.MemStats) any { return m.Sys },
 	},
 	{
 		Name: "TotalAlloc",
 		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) float64 { return float64(m.TotalAlloc) },
+		Get:  func(m *runtime.MemStats) any { return m.TotalAlloc },
 	},
 }

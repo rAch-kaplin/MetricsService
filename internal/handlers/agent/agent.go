@@ -15,16 +15,52 @@ import (
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 )
 
+func toFloat64(val any) (float64, bool) {
+    switch v := val.(type) {
+    case float64:
+        return v, true
+    case uint64:
+        return float64(v), true
+    case uint32:
+        return float64(v), true
+    case int:
+        return float64(v), true
+    case int64:
+        return float64(v), true
+    default:
+        return 0, false
+    }
+}
+
 func UpdateAllMetrics(storage *ms.MemStorage) {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
 	for _, stat := range rt.MemRuntimeStats {
-		if err := storage.UpdateMetric(mtr.NewGauge(stat.Name, stat.Get(&memStats))); err != nil {
-			log.Error().
-				Err(err).
-				Str("metric", stat.Name).
-				Msg("Failed to update metric")
+		val := stat.Get(&memStats)
+
+		switch stat.Type {
+		case mtr.GaugeType:
+			value, ok := toFloat64(val)
+			if !ok {
+				log.Error().
+					Str("metric", stat.Name).
+					Str("type", fmt.Sprintf("%T", val)).
+					Msg("Failed to convert metric value to float64")
+				continue
+			}
+
+			if err := storage.UpdateMetric(mtr.NewGauge(stat.Name, value)); err != nil {
+            log.Error().
+                Err(err).
+                Str("metric", stat.Name).
+                Msg("Failed to update metric")
+        	}
+		default:
+			 log.Error().
+                Str("metric", stat.Name).
+                Str("type", fmt.Sprintf("%T", val)).
+                Msg("Unsupported metric type")
 		}
 	}
 
