@@ -9,7 +9,7 @@ on:
 jobs:
   statictest:
     runs-on: ubuntu-latest
-    container: golang:1.22
+    container: golang:1.24
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -17,7 +17,7 @@ jobs:
       - name: Download statictest binary
         uses: robinraju/release-downloader@v1.8
         with:
-          repository: mipt-golang-course/go-autotests
+          repository: rAch-kaplin/go-autotests.git@update-go-version
           latest: true
           fileName: statictest
           out-file-path: .tools
