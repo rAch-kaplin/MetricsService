@@ -40,7 +40,7 @@ jobs:
       - name: Download autotests binaries
         uses: robinraju/release-downloader@v1.8
         with:
-          repository: mipt-golang-course/go-autotests
+          repository: rAch-kaplin/go-autotests
           latest: true
           fileName: "*"
           out-file-path: .tools
