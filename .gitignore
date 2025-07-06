@@ -35,3 +35,6 @@ logFileServer.log
 logFileAgent.log
 cmd/server/server
 cmd/agent/agent
+
+
+log.txt
