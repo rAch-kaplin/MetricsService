@@ -1,8 +1,6 @@
 module github.com/rAch-kaplin/mipt-golang-course/MetricsService
 
-go 1.24
-
-toolchain go1.24.3
+go 1.24.3
 
 require (
 	github.com/caarlos0/env/v6 v6.10.1
