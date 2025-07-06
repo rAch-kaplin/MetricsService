@@ -101,7 +101,6 @@ func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 	}
 }
 
-
 func sendMetric(client *resty.Client, mType string, mName string, mValue interface{}) {
 	res, err := client.R().
 		SetHeader("Content-Type", "text/plain").
