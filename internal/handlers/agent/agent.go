@@ -74,16 +74,33 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 }
 
 func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
-	gauges, counters := storage.GetAllMetrics()
+	allMetrics := storage.GetAllMetrics()
 
-	for name, value := range gauges {
-		sendMetric(client, mtr.GaugeType, name, value)
-	}
+	for mType, innerMap := range allMetrics {
+		for mName, metric := range innerMap {
+			switch mType {
+			case mtr.GaugeType:
+				val, ok := metric.Value().(float64)
+				if !ok {
+					log.Error().Str("metric_name", mName).Str("metric_type", mType).
+					Msg("Invalid metric value type")
+					continue
+				}
+				sendMetric(client, mtr.GaugeType, mName, val)
 
-	for name, value := range counters {
-		sendMetric(client, mtr.CounterType, name, value)
+			case mtr.CounterType:
+				val, ok := metric.Value().(int64)
+				if !ok {
+					log.Error().Str("metric_name", mName).Str("metric_type", mType).
+					Msg("Invalid metric value type")
+					continue
+				}
+				sendMetric(client, mtr.CounterType, mName, val)
+			}
+		}
 	}
 }
+
 
 func sendMetric(client *resty.Client, mType string, mName string, mValue interface{}) {
 	res, err := client.R().
@@ -102,8 +119,6 @@ func sendMetric(client *resty.Client, mType string, mName string, mValue interfa
 
 	if res.StatusCode() != http.StatusOK {
 		log.Error().Msgf("Server returned non-OK status for %s/%s: %d %s", mType, mName, res.StatusCode(), res.String())
-	} else {
-		log.Debug().Msgf("Metric %s/%s sent successfully. Status: %d", mType, mName, res.StatusCode())
 	}
 }
 

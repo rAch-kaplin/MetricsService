@@ -5,9 +5,10 @@ import (
 )
 
 type Metric interface {
-	Value() interface{}
+	Value() any
 	Name() string
 	Type() string
+	Update(mtr Metric) error
 }
 
 const (

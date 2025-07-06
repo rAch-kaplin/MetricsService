@@ -55,10 +55,6 @@ func NewGauge(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
 	return mtr.NewGauge(name, val), nil
 }
 
-func HandleUnknownMetric(res http.ResponseWriter) {
-	http.Error(res, "unknown type metric!", http.StatusBadRequest)
-}
-
 func GetMetric(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		log.Debug().Msgf("Incoming GET request: %s %s", req.Method, req.URL.Path)
@@ -99,23 +95,40 @@ func GetMetric(storage ms.Collector) http.HandlerFunc {
 
 func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		gauges, counters := storage.GetAllMetrics()
+		allMetrics := storage.GetAllMetrics()
 
 		var metricsToTable []MetricTable
 
-		for name, value := range gauges {
-			metricsToTable = append(metricsToTable, MetricTable{
-				Name:  name,
-				Type:  mtr.GaugeType,
-				Value: strconv.FormatFloat(value, 'f', -1, 64),
-			})
-		}
-		for name, value := range counters {
-			metricsToTable = append(metricsToTable, MetricTable{
-				Name:  name,
-				Type:  mtr.CounterType,
-				Value: strconv.FormatInt(value, 10),
-			})
+		for mType, innerMap := range allMetrics {
+			for mName, metric := range innerMap {
+				var valStr string
+
+				switch metric.Type() {
+				case mtr.GaugeType:
+					val, ok := metric.Value().(float64)
+					if !ok {
+						log.Error().Str("metric_name", mName).Str("metric_type", mType).
+					Msg("Invalid metric value type")
+						continue
+					}
+					valStr = strconv.FormatFloat(val, 'f', -1, 64)
+
+				case mtr.CounterType:
+					val, ok := metric.Value().(int64)
+					if !ok {
+						log.Error().Str("metric_name", mName).Str("metric_type", mType).
+					Msg("Invalid metric value type")
+						continue
+					}
+					valStr = strconv.FormatInt(val, 10)
+				}
+
+				metricsToTable = append(metricsToTable, MetricTable{
+					Name:  mName,
+					Type:  mType,
+					Value: valStr,
+				})
+			}
 		}
 
 		const htmlTemplate = `
@@ -190,7 +203,7 @@ func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 		case mtr.CounterType:
 			metric, err = NewCounter(res, mName, mValue)
 		default:
-			HandleUnknownMetric(res)
+			http.Error(res, "unknown type metric!", http.StatusBadRequest)
 			return
 		}
 

@@ -20,11 +20,26 @@ func (g *gauge) Type() string {
 	return GaugeType
 }
 
-func (g *gauge) Value() interface{} {
+func (g *gauge) Value() any {
 	return g.value
 }
 
-func (g *gauge) SetValue(v interface{}) error {
+func (g *gauge) Update(mtr Metric) error {
+	if mtr.Type() != g.Type() {
+		return ErrInvalidMetricsType
+	}
+
+	mtrValue, ok := mtr.Value().(float64)
+	if !ok {
+		return ErrInvalidValueType
+	}
+
+	g.value = mtrValue
+
+	return nil
+}
+
+func (g *gauge) SetValue(v any) error {
 	val, ok := v.(float64)
 	if !ok {
 		return ErrInvalidValueType
