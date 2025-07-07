@@ -24,12 +24,12 @@ func (c *counter) Value() any {
 	return c.value
 }
 
-func (c *counter) Update(mtr Metric) error {
-	if mtr.Type() != c.Type() {
+func (c *counter) Update(mType, mName string, mValue any) error {
+	if mType != c.Type() {
 		return ErrInvalidMetricsType
 	}
 
-	mtrValue, ok := mtr.Value().(int64)
+	mtrValue, ok := mValue.(int64)
 	if !ok {
 		return ErrInvalidValueType
 	}

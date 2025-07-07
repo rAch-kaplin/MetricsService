@@ -24,12 +24,12 @@ func (g *gauge) Value() any {
 	return g.value
 }
 
-func (g *gauge) Update(mtr Metric) error {
-	if mtr.Type() != g.Type() {
+func (g *gauge) Update(mType, mName string, mValue any) error {
+	if mType != g.Type() {
 		return ErrInvalidMetricsType
 	}
 
-	mtrValue, ok := mtr.Value().(float64)
+	mtrValue, ok := mValue.(float64)
 	if !ok {
 		return ErrInvalidValueType
 	}

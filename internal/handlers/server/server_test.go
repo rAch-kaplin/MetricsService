@@ -82,13 +82,14 @@ func TestUpdateMetric(t *testing.T) {
 func TestGetMetric(t *testing.T) {
 	storage := ms.NewMemStorage()
 
-	if err := storage.UpdateMetric(mtr.NewGauge("cpu_usage", 75.5)); err != nil {
+	if err := storage.UpdateMetric(mtr.GaugeType, "cpu_usage", 75.5); err != nil {
 		log.Error().Msgf("Failed to update metric cpu_usage: %v", err)
 	}
 
-	if err := storage.UpdateMetric(mtr.NewCounter("requests_total", 100)); err != nil {
+	if err := storage.UpdateMetric(mtr.CounterType, "requests_total", int64(100)); err != nil {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
+
 	router := NewRouter(storage)
 
 	tests := []struct {
