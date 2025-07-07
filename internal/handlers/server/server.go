@@ -14,6 +14,13 @@ import (
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
+type Metrics struct {
+    ID    string   `json:"id"`
+    MType string   `json:"type"`
+    Delta *int64   `json:"delta,omitempty"`
+    Value *float64 `json:"value,omitempty"`
+}
+
 type MetricTable struct {
 	Name  string
 	Type  string
@@ -214,13 +221,6 @@ func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 
 		res.WriteHeader(http.StatusOK)
 	}
-}
-
-type Metrics struct {
-    ID    string   `json:"id"`
-    MType string   `json:"type"`
-    Delta *int64   `json:"delta,omitempty"`
-    Value *float64 `json:"value,omitempty"`
 }
 
 func FillMetricValueFromStorage(storage ms.Collector, metric *Metrics) bool {
