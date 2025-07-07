@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/mailru/easyjson"
 
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
@@ -27,6 +28,8 @@ func NewRouter(storage ms.Collector) http.Handler {
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", GetAllMetrics(storage))
 		r.Route("/", func(r chi.Router) {
+			r.Post("/update/", UpdateMetricsHandlerJSON(storage))
+			r.Post("/value/", GetMetricsHandlerJSON(storage))
 			r.Get("/value/{mType}/{mName}", GetMetric(storage))
 			r.Post("/update/{mType}/{mName}/{mValue}", UpdateMetric(storage))
 		})
@@ -210,5 +213,110 @@ func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 			Msg("Metric updated successfully")
 
 		res.WriteHeader(http.StatusOK)
+	}
+}
+
+type Metrics struct {
+    ID    string   `json:"id"`
+    MType string   `json:"type"`
+    Delta *int64   `json:"delta,omitempty"`
+    Value *float64 `json:"value,omitempty"`
+}
+
+func FillMetricValueFromStorage(storage ms.Collector, metric *Metrics) bool {
+	value, ok := storage.GetMetric(metric.MType, metric.ID)
+	if !ok {
+		return false
+	}
+
+	switch v := value.(type) {
+	case float64:
+		metric.Value = &v
+	case int64:
+		metric.Delta = &v
+	default:
+		log.Error().
+			Str("metricType", metric.MType).
+			Str("metricName", metric.ID).
+			Msg("unsupported metric type")
+
+		return false
+	}
+
+	return true
+}
+
+func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
+	return func(resp http.ResponseWriter, req *http.Request) {
+		var metric Metrics
+
+		if req.Header.Get("Content-Type") != "application/json" {
+			http.Error(resp, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+			return
+		}
+
+		if err := easyjson.UnmarshalFromReader(req.Body, &metric); err != nil {
+			http.Error(resp, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		if !FillMetricValueFromStorage(storage, &metric) {
+			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
+			return
+		}
+
+		started, n, err := easyjson.MarshalToHTTPResponseWriter(&metric, resp)
+		if err != nil {
+			if !started {
+				http.Error(resp, "failed to encode json", http.StatusInternalServerError)
+			} else {
+				log.Error().Err(err).
+					Int("written_bytes", n).
+					Msg("error while writing json response")
+			}
+		}
+	}
+}
+
+func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
+	return func(resp http.ResponseWriter, req *http.Request) {
+		var metric Metrics
+
+		if req.Header.Get("Content-Type") != "application/json" {
+			http.Error(resp, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+			return
+		}
+
+		if err := easyjson.UnmarshalFromReader(req.Body, &metric); err != nil {
+			http.Error(resp, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		var value any
+		if metric.MType == mtr.GaugeType {
+			value = *metric.Value
+		} else {
+			value = *metric.Delta
+		}
+
+		if err := storage.UpdateMetric(metric.MType, metric.ID, value); err != nil {
+			http.Error(resp, fmt.Sprintf("invalid update metric %s: %v", metric.ID, err), http.StatusBadRequest)
+		}
+
+		if !FillMetricValueFromStorage(storage, &metric) {
+			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
+			return
+		}
+
+		started, n, err := easyjson.MarshalToHTTPResponseWriter(&metric, resp)
+		if err != nil {
+			if !started {
+				http.Error(resp, "failed to encode json", http.StatusInternalServerError)
+			} else {
+				log.Error().Err(err).
+					Int("written_bytes", n).
+					Msg("error while writing json response")
+			}
+		}
 	}
 }
