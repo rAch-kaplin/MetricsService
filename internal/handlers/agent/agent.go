@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -8,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/mailru/easyjson"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
@@ -121,9 +124,16 @@ func sendMetric(client *resty.Client, metricJSON *server.Metrics) {
 		1 * time.Second,
 	}
 
+	// buf, err := ConvertToGzipData(metricJSON)
+	// if err != nil {
+	// 	log.Error().Err(err).Msg("Failed to convert metric to gzip")
+	// 	return
+	// }
+
 	for _, backoff := range backoffSchedule {
 		res, err := client.R().
 			SetHeader("Content-Type", "application/json").
+			SetHeader("Content-Encoding", "gzip").
 			SetBody(metricJSON).
 			Post("update/")
 
@@ -134,6 +144,31 @@ func sendMetric(client *resty.Client, metricJSON *server.Metrics) {
 
 		time.Sleep(backoff)
 	}
+}
+
+func ConvertToGzipData(metricJSON *server.Metrics) (*bytes.Buffer, error) {
+	jsonData, err := easyjson.Marshal(*metricJSON)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to marshal metricJSON")
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	defer func() {
+		err := gz.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to close gzip writer")
+		}
+	}()
+
+	_, err = gz.Write(jsonData)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to write gzip data")
+		return nil, err
+	}
+
+	return &buf, nil
 }
 
 func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
