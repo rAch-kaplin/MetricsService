@@ -35,20 +35,20 @@ func NewRouter(storage ms.Collector) http.Handler {
 
 func ConvertByType(mType, mValue string) (any, error) {
 	switch mType {
-		case mtr.GaugeType:
-			if val, err := strconv.ParseFloat(mValue, 64); err != nil {
-				return nil, fmt.Errorf("convert gauge value %s: %w", mValue, err)
-			} else {
-				return val, nil
-			}
-		case mtr.CounterType:
-			if val, err := strconv.ParseInt(mValue, 10, 64); err != nil {
-				return nil, fmt.Errorf("convert counter value %s: %w", mValue, err)
-			} else {
-				return val, nil
-			}
-		default:
-			return nil, fmt.Errorf("unknown metric type: %s", mType)
+	case mtr.GaugeType:
+		if val, err := strconv.ParseFloat(mValue, 64); err != nil {
+			return nil, fmt.Errorf("convert gauge value %s: %w", mValue, err)
+		} else {
+			return val, nil
+		}
+	case mtr.CounterType:
+		if val, err := strconv.ParseInt(mValue, 10, 64); err != nil {
+			return nil, fmt.Errorf("convert counter value %s: %w", mValue, err)
+		} else {
+			return val, nil
+		}
+	default:
+		return nil, fmt.Errorf("unknown metric type: %s", mType)
 	}
 }
 
@@ -96,36 +96,36 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 
 		var metricsToTable []MetricTable
 
-		for mType, innerMap := range allMetrics {
-			for mName, metric := range innerMap {
-				var valStr string
+		for _, metric := range allMetrics {
+			var valStr string
+			mName := metric.Name()
+			mType := metric.Type()
 
-				switch metric.Type() {
-				case mtr.GaugeType:
-					val, ok := metric.Value().(float64)
-					if !ok {
-						log.Error().Str("metric_name", mName).Str("metric_type", mType).
-					Msg("Invalid metric value type")
-						continue
-					}
-					valStr = strconv.FormatFloat(val, 'f', -1, 64)
-
-				case mtr.CounterType:
-					val, ok := metric.Value().(int64)
-					if !ok {
-						log.Error().Str("metric_name", mName).Str("metric_type", mType).
-					Msg("Invalid metric value type")
-						continue
-					}
-					valStr = strconv.FormatInt(val, 10)
+			switch mType {
+			case mtr.GaugeType:
+				val, ok := metric.Value().(float64)
+				if !ok {
+					log.Error().Str("metric_name", mName).Str("metric_type", mType).
+						Msg("Invalid metric value type")
+					continue
 				}
+				valStr = strconv.FormatFloat(val, 'f', -1, 64)
 
-				metricsToTable = append(metricsToTable, MetricTable{
-					Name:  mName,
-					Type:  mType,
-					Value: valStr,
-				})
+			case mtr.CounterType:
+				val, ok := metric.Value().(int64)
+				if !ok {
+					log.Error().Str("metric_name", mName).Str("metric_type", mType).
+						Msg("Invalid metric value type")
+					continue
+				}
+				valStr = strconv.FormatInt(val, 10)
 			}
+
+			metricsToTable = append(metricsToTable, MetricTable{
+				Name:  mName,
+				Type:  mType,
+				Value: valStr,
+			})
 		}
 
 		const htmlTemplate = `

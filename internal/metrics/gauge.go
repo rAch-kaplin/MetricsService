@@ -24,11 +24,7 @@ func (g *gauge) Value() any {
 	return g.value
 }
 
-func (g *gauge) Update(mType, mName string, mValue any) error {
-	if mType != g.Type() {
-		return ErrInvalidMetricsType
-	}
-
+func (g *gauge) Update(mName string, mValue any) error {
 	mtrValue, ok := mValue.(float64)
 	if !ok {
 		return ErrInvalidValueType

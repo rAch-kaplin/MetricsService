@@ -43,27 +43,28 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 	allMetrics := storage.GetAllMetrics()
 
-	for mType, innerMap := range allMetrics {
-		for mName, metric := range innerMap {
-			switch mType {
-			case mtr.GaugeType:
-				val, ok := metric.Value().(float64)
-				if !ok {
-					log.Error().Str("metric_name", mName).Str("metric_type", mType).
-					Msg("Invalid metric value type")
-					continue
-				}
-				sendMetric(client, mtr.GaugeType, mName, val)
+	for _, metric := range allMetrics {
+		mType := metric.Type()
+		mName := metric.Name()
 
-			case mtr.CounterType:
-				val, ok := metric.Value().(int64)
-				if !ok {
-					log.Error().Str("metric_name", mName).Str("metric_type", mType).
+		switch mType {
+		case mtr.GaugeType:
+			val, ok := metric.Value().(float64)
+			if !ok {
+				log.Error().Str("metric_name", mName).Str("metric_type", mType).
 					Msg("Invalid metric value type")
-					continue
-				}
-				sendMetric(client, mtr.CounterType, mName, val)
+				continue
 			}
+			sendMetric(client, mtr.GaugeType, mName, val)
+
+		case mtr.CounterType:
+			val, ok := metric.Value().(int64)
+			if !ok {
+				log.Error().Str("metric_name", mName).Str("metric_type", mType).
+					Msg("Invalid metric value type")
+				continue
+			}
+			sendMetric(client, mtr.CounterType, mName, val)
 		}
 	}
 }

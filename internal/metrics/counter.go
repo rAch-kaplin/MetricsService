@@ -24,11 +24,7 @@ func (c *counter) Value() any {
 	return c.value
 }
 
-func (c *counter) Update(mType, mName string, mValue any) error {
-	if mType != c.Type() {
-		return ErrInvalidMetricsType
-	}
-
+func (c *counter) Update(mName string, mValue any) error {
 	mtrValue, ok := mValue.(int64)
 	if !ok {
 		return ErrInvalidValueType

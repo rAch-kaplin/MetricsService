@@ -1,7 +1,6 @@
 package memstorage
 
 import (
-	"maps"
 	"sync"
 
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
@@ -9,7 +8,7 @@ import (
 
 type Collector interface {
 	GetMetric(mType, mName string) (any, bool)
-	GetAllMetrics() map[string]map[string]mtr.Metric
+	GetAllMetrics() []mtr.Metric
 	UpdateMetric(mType, mName string, mValue any) error
 }
 
@@ -33,7 +32,7 @@ func (ms *MemStorage) UpdateMetric(mType, mName string, mValue any) error {
 	}
 
 	if oldMetric, ok := ms.storage[mType][mName]; ok {
-		return oldMetric.Update(mType, mName, mValue)
+		return oldMetric.Update(mName, mValue)
 	}
 
 	var newMetric mtr.Metric
@@ -71,15 +70,20 @@ func (ms *MemStorage) GetMetric(mType, mName string) (any, bool) {
 	return nil, false
 }
 
-func (ms *MemStorage) GetAllMetrics() map[string]map[string]mtr.Metric {
+func (ms *MemStorage) GetAllMetrics() []mtr.Metric {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
-	result := make(map[string]map[string]mtr.Metric, len(ms.storage))
+	total := 0
+	for _, innerMap := range ms.storage {
+		total += len(innerMap)
+	}
+	result := make([]mtr.Metric, 0, total)
 
-	for mType, innerMap := range ms.storage {
-		innerCopy := maps.Clone(innerMap)
-		result[mType] = innerCopy
+	for _, innerMap := range ms.storage {
+		for _, metric := range innerMap {
+			result = append(result, metric)
+		}
 	}
 
 	return result

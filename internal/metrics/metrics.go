@@ -8,7 +8,7 @@ type Metric interface {
 	Value() any
 	Name() string
 	Type() string
-	Update(mType, mName string, mValue any) error
+	Update(mName string, mValue any) error
 }
 
 const (
