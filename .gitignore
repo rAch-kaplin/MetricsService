@@ -30,3 +30,11 @@ go.work.sum
 # IDEs directories
 .idea
 .vscode
+logFile.log
+logFileServer.log
+logFileAgent.log
+cmd/server/server
+cmd/agent/agent
+
+
+log.txt
