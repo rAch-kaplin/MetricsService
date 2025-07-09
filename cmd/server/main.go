@@ -1,18 +1,34 @@
 package main
 
 import (
+	"flag"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-  
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
 )
+
+const (
+	defaultEndpoint = "localhost:8080"
+)
+
+type options struct {
+	endPointAddr string
+}
+
+func flagsInit(opts *options) {
+	flag.StringVar(&opts.endPointAddr, "a", defaultEndpoint, "endpoint HTTP-server address")
+	flag.Parse()
+}
 
 func main() {
 	log.Init(log.DebugLevel, "logFile.log")
 	defer log.Destroy()
+
+	var opts options
+	flagsInit(&opts)
 
 	log.Debug("START SERVER>")
 
@@ -27,7 +43,7 @@ func main() {
 		})
 	})
 
-	if err := http.ListenAndServe(`:8080`, r); err != nil {
+	if err := http.ListenAndServe(opts.endPointAddr, r); err != nil {
 		panic(err)
 	}
 	log.Debug("END SERVER<")

@@ -14,10 +14,6 @@ import (
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
 )
 
-const (
-	serverAddress = "http://localhost:8080"
-)
-
 type MemRuntimeStat struct {
 	Name string
 	Type string
@@ -178,7 +174,6 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
             if stat.Type == mtr.GaugeType {
                 metric = mtr.NewGauge(stat.Name, float64(v))
             }
-
 		default:
 			log.Error("ERROR: Unknown type for metric %s: %T", stat.Name, value)
 			continue
@@ -206,7 +201,7 @@ func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 }
 
 func sendMetric(client *resty.Client, mType string, mName string, mValue interface{}) {
-	url := fmt.Sprintf("%s/update/%s/%s/%v", serverAddress, mType, mName, mValue)
+	url := fmt.Sprintf("update/%s/%s/%v", mType, mName, mValue)
 
 	res, err := client.R().
 		SetHeader("Content-Type", "text/plain").
