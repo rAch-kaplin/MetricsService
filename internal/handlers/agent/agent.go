@@ -9,218 +9,88 @@ import (
 
 	"github.com/go-resty/resty/v2"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
-	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
+	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
+	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 )
-
-type MemRuntimeStat struct {
-	Name string
-	Type string
-	Get  func(m *runtime.MemStats) interface{}
-}
-
-var MemRuntimeStats []MemRuntimeStat = []MemRuntimeStat{
-	{
-		Name: "Alloc",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.Alloc },
-	},
-	{
-		Name: "BuckHashSys",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.BuckHashSys },
-	},
-	{
-		Name: "Frees",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.Frees },
-	},
-	{
-		Name: "GCCPUFraction",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.GCCPUFraction },
-	},
-	{
-		Name: "HeapAlloc",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.HeapAlloc },
-	},
-	{
-		Name: "HeapIdle",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.HeapIdle },
-	},
-	{
-		Name: "HeapInuse",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.HeapInuse },
-	},
-	{
-		Name: "HeapObjects",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.HeapObjects },
-	},
-	{
-		Name: "HeapReleased",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.HeapReleased },
-	},
-	{
-		Name: "HeapSys",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.HeapSys },
-	},
-	{
-		Name: "LastGC",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.LastGC },
-	},
-	{
-		Name: "Lookups",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.Lookups },
-	},
-	{
-		Name: "MCacheInuse",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.MCacheInuse },
-	},
-	{
-		Name: "MCacheSys",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.MCacheSys },
-	},
-	{
-		Name: "MSpanInuse",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.MSpanInuse },
-	},
-	{
-		Name: "MSpanSys",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.MSpanSys },
-	},
-	{
-		Name: "Mallocs",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.Mallocs },
-	},
-	{
-		Name: "NextGC",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.NextGC },
-	},
-	{
-		Name: "NumForcedGC",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.NumForcedGC },
-	},
-	{
-		Name: "NumGC",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.NumGC },
-	},
-	{
-		Name: "OtherSys",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.OtherSys },
-	},
-	{
-		Name: "PauseTotalNs",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.PauseTotalNs },
-	},
-	{
-		Name: "StackInuse",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.StackInuse },
-	},
-	{
-		Name: "StackSys",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.StackSys },
-	},
-	{
-		Name: "Sys",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.Sys },
-	},
-	{
-		Name: "TotalAlloc",
-		Type: mtr.GaugeType,
-		Get:  func(m *runtime.MemStats) interface{} { return m.TotalAlloc },
-	},
-}
 
 func UpdateAllMetrics(storage *ms.MemStorage) {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
-	for _, stat := range MemRuntimeStats {
-		value := stat.Get(&memStats)
-		var metric mtr.Metric
+	for _, stat := range rt.MemRuntimeStats {
+		val := stat.Get(&memStats)
 
-		switch v := value.(type) {
-		case uint64:
-			if stat.Type == mtr.GaugeType {
-				metric = mtr.NewGauge(stat.Name, float64(v))
-			}
-		case float64:
-			if stat.Type == mtr.GaugeType {
-				metric = mtr.NewGauge(stat.Name, v)
-			}
-		case uint32:
-            if stat.Type == mtr.GaugeType {
-                metric = mtr.NewGauge(stat.Name, float64(v))
-            }
-		default:
-			log.Error("ERROR: Unknown type for metric %s: %T", stat.Name, value)
-			continue
-		}
-
-		if err := storage.UpdateMetric(metric); err != nil {
-			log.Error("ERROR!")
+		if err := storage.UpdateMetric(stat.Type, stat.Name, val); err != nil {
+			log.Error().
+				Err(err).
+				Str("metric", stat.Name).
+				Str("type", fmt.Sprintf("%T", val)).
+				Msg("Failed to update runtime metric")
 		}
 	}
 
-	storage.UpdateMetric(mtr.NewCounter("PollCount", 1))
-	storage.UpdateMetric(mtr.NewGauge("RandomValue", rand.Float64()))
+	if err := storage.UpdateMetric(mtr.CounterType, "PollCount", 1); err != nil {
+		log.Error().Msgf("Failed to update PollCount metric: %v", err)
+	}
+
+	if err := storage.UpdateMetric(mtr.GaugeType, "RandomValue", rand.Float64()); err != nil {
+		log.Error().Msgf("Failed to update RandomValue metric: %v", err)
+	}
 }
 
 func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
-	gauges, counters := storage.GetAllMetrics()
+	allMetrics := storage.GetAllMetrics()
 
-	for name, value := range gauges {
-		sendMetric(client, mtr.GaugeType, name, value)
-	}
+	for _, metric := range allMetrics {
+		mType := metric.Type()
+		mName := metric.Name()
 
-	for name, value := range counters {
-		sendMetric(client, mtr.CounterType, name, value)
+		switch mType {
+		case mtr.GaugeType:
+			val, ok := metric.Value().(float64)
+			if !ok {
+				log.Error().Str("metric_name", mName).Str("metric_type", mType).
+					Msg("Invalid metric value type")
+				continue
+			}
+			sendMetric(client, mtr.GaugeType, mName, val)
+
+		case mtr.CounterType:
+			val, ok := metric.Value().(int64)
+			if !ok {
+				log.Error().Str("metric_name", mName).Str("metric_type", mType).
+					Msg("Invalid metric value type")
+				continue
+			}
+			sendMetric(client, mtr.CounterType, mName, val)
+		}
 	}
 }
 
 func sendMetric(client *resty.Client, mType string, mName string, mValue interface{}) {
-	url := fmt.Sprintf("update/%s/%s/%v", mType, mName, mValue)
-
 	res, err := client.R().
 		SetHeader("Content-Type", "text/plain").
-		Post(url)
+		SetPathParams(map[string]string{
+			"mType":  mType,
+			"mName":  mName,
+			"mValue": fmt.Sprintf("%v", mValue),
+		}).
+		Post("update/{mType}/{mName}/{mValue}")
 
 	if err != nil {
-		log.Error("Error creating a request for %s: %v", mName, err)
+		log.Error().Msgf("Error creating a request for %s: %v", mName, err)
 		return
 	}
 
 	if res.StatusCode() != http.StatusOK {
-		log.Error("Server returned non-OK status for %s/%s: %d %s", mType, mName, res.StatusCode(), res.String())
-	} else {
-		log.Debug("Metric %s/%s sent successfully. Status: %d", mType, mName, res.StatusCode())
+		log.Error().Msgf("Server returned non-OK status for %s/%s: %d %s", mType, mName, res.StatusCode(), res.String())
 	}
 }
 
 func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
-	log.Debug("collectionLoop ...")
+	log.Debug().Msg("collectionLoop ...")
 	for {
 		UpdateAllMetrics(storage)
 		time.Sleep(interval)
@@ -228,7 +98,7 @@ func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
 }
 
 func ReportLoop(client *resty.Client, storage *ms.MemStorage, interval time.Duration) {
-	log.Debug("reportLoop ...")
+	log.Debug().Msg("reportLoop ...")
 	for {
 		time.Sleep(interval)
 		sendAllMetrics(client, storage)

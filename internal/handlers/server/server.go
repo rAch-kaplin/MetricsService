@@ -8,9 +8,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
-	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
+	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
 type MetricTable struct {
@@ -19,39 +19,46 @@ type MetricTable struct {
 	Value string
 }
 
-// FIXME other function name
-func NewCounter(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
-	val, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		http.Error(res, "invalid value metric", http.StatusBadRequest)
-		return nil, err
-	}
+func NewRouter(storage ms.Collector) http.Handler {
+	r := chi.NewRouter()
 
-	return mtr.NewCounter(name, val), nil
+	r.Route("/", func(r chi.Router) {
+		r.Get("/", GetAllMetrics(storage))
+		r.Route("/", func(r chi.Router) {
+			r.Get("/value/{mType}/{mName}", GetMetric(storage))
+			r.Post("/update/{mType}/{mName}/{mValue}", UpdateMetric(storage))
+		})
+	})
+
+	return r
 }
 
-// FIXME other function name
-func NewGauge(res http.ResponseWriter, name, value string) (mtr.Metric, error) {
-	val, err := strconv.ParseFloat(value, 64)
-	if err != nil {
-		http.Error(res, "invalid value metric", http.StatusBadRequest)
-		return nil, err
+func ConvertByType(mType, mValue string) (any, error) {
+	switch mType {
+	case mtr.GaugeType:
+		if val, err := strconv.ParseFloat(mValue, 64); err != nil {
+			return nil, fmt.Errorf("convert gauge value %s: %w", mValue, err)
+		} else {
+			return val, nil
+		}
+	case mtr.CounterType:
+		if val, err := strconv.ParseInt(mValue, 10, 64); err != nil {
+			return nil, fmt.Errorf("convert counter value %s: %w", mValue, err)
+		} else {
+			return val, nil
+		}
+	default:
+		return nil, fmt.Errorf("unknown metric type: %s", mType)
 	}
-
-	return mtr.NewGauge(name, val), nil
-}
-
-func HandleUnknownMetric(res http.ResponseWriter) {
-	http.Error(res, "unknown type metric!", http.StatusBadRequest)
 }
 
 func GetMetric(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		log.Debug("Incoming GET request: %s %s", req.Method, req.URL.Path)
+		log.Debug().Msgf("Incoming GET request: %s %s", req.Method, req.URL.Path)
 
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
-		log.Debug("Incoming request for metric: Type=%s, Name=%s", mType, mName)
+		log.Debug().Msgf("Incoming request for metric: Type=%s, Name=%s", mType, mName)
 
 		value, found := storage.GetMetric(mType, mName)
 		if !found {
@@ -67,35 +74,57 @@ func GetMetric(storage ms.Collector) http.HandlerFunc {
 			valueStr = strconv.FormatInt(v, 10)
 		default:
 			http.Error(res, "an unexpected type of metric", http.StatusInternalServerError)
-			return //FIXME fix this case
+			return
 		}
 
 		res.Header().Set("Content-Type", "text/plain")
 		res.WriteHeader(http.StatusOK)
-		res.Write([]byte(valueStr))
 
-		log.Debug("the metric has been send")
+		_, err := res.Write([]byte(valueStr))
+		if err != nil {
+			log.Error().Msgf("Failed to write response: %v", err)
+
+		}
+
+		log.Debug().Msg("the metric has been send")
 	}
 }
 
 func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		gauges, counters := storage.GetAllMetrics()
+		allMetrics := storage.GetAllMetrics()
 
 		var metricsToTable []MetricTable
 
-		for name, value := range gauges {
+		for _, metric := range allMetrics {
+			var valStr string
+			mName := metric.Name()
+			mType := metric.Type()
+
+			switch mType {
+			case mtr.GaugeType:
+				val, ok := metric.Value().(float64)
+				if !ok {
+					log.Error().Str("metric_name", mName).Str("metric_type", mType).
+						Msg("Invalid metric value type")
+					continue
+				}
+				valStr = strconv.FormatFloat(val, 'f', -1, 64)
+
+			case mtr.CounterType:
+				val, ok := metric.Value().(int64)
+				if !ok {
+					log.Error().Str("metric_name", mName).Str("metric_type", mType).
+						Msg("Invalid metric value type")
+					continue
+				}
+				valStr = strconv.FormatInt(val, 10)
+			}
+
 			metricsToTable = append(metricsToTable, MetricTable{
-				Name:  name,
-				Type:  mtr.GaugeType,
-				Value: strconv.FormatFloat(value, 'f', -1, 64),
-			})
-		}
-		for name, value := range counters {
-			metricsToTable = append(metricsToTable, MetricTable{
-				Name:  name,
-				Type:  mtr.CounterType,
-				Value: strconv.FormatInt(value, 10),
+				Name:  mName,
+				Type:  mType,
+				Value: valStr,
 			})
 		}
 
@@ -131,7 +160,7 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 
 		template, err := template.New("Metrics").Parse(htmlTemplate)
 		if err != nil {
-			log.Error("couldn't make it out HTML template: %v", err)
+			log.Error().Msgf("couldn't make it out HTML template: %v", err)
 			http.Error(res, "Internal server error, failed html-template", http.StatusInternalServerError)
 			return
 		}
@@ -139,53 +168,63 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 		res.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 		if err := template.Execute(res, metricsToTable); err != nil {
-			log.Error("failed complete template: %v", err)
+			log.Error().Msgf("failed complete template: %v", err)
 		}
 
-		log.Debug("the metrics has been send")
+		log.Debug().Msg("the metrics has been send")
 		res.WriteHeader(http.StatusOK)
 	}
 }
 
 func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		log.Debug("Incoming POST request: %s %s", req.Method, req.URL.Path)
+		log.Debug().
+			Str("method", req.Method).
+			Str("url", req.URL.Path).
+			Msg("Incoming POST request")
 
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
 		mValue := chi.URLParam(req, "mValue")
-		log.Debug("Parsed metric: type=%s, name=%s, value=%s", mType, mName, mValue)
+    
+		log.Debug().
+			Str("metric_type", mType).
+			Str("metric_name", mName).
+			Str("metric_value", mValue).
+			Msg("Parsed metric")
 
 		if mName == "" {
-			log.Error("the metric name is not specified")
+			log.Error().
+				Str("metric_type", mType).
+				Msg("Metric name is not specified")
+
 			http.Error(res, "the metric name is not specified", http.StatusBadRequest)
 			return
 		}
 
-		var metric mtr.Metric
-		var err error
-
-		switch mType {
-		case mtr.GaugeType:
-			metric, err = NewGauge(res, mName, mValue)
-		case mtr.CounterType:
-			metric, err = NewCounter(res, mName, mValue)
-		default:
-			HandleUnknownMetric(res)
-			return
-		}
-
+		val, err := ConvertByType(mType, mValue)
 		if err != nil {
+			log.Error().
+				Err(err).
+				Str("metric_type", mType).
+				Str("metric_value", mValue).
+				Msg("Failed to convert metric value")
+
+			http.Error(res, fmt.Sprintf("invalid metric value: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		if err := storage.UpdateMetric(mType, mName, val); err != nil {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		if err := storage.UpdateMetric(metric); err != nil {
-			http.Error(res, err.Error(), http.StatusBadRequest)
-			return
-		}
+		log.Info().
+			Str("metric_type", mType).
+			Str("metric_name", mName).
+			Interface("value", val).
+			Msg("Metric updated successfully")
 
-		log.Info("Metric updated successfully: %s %s = %s", mType, mName, mValue)
 		res.WriteHeader(http.StatusOK)
 	}
 }

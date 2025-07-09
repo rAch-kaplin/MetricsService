@@ -18,7 +18,7 @@ jobs:
 
   metricstest:
     runs-on: ubuntu-latest
-    container: golang:1.24.1
+    container: golang:1.24.3
     needs: branchtest
 
     services:
@@ -40,7 +40,7 @@ jobs:
       - name: Download autotests binaries
         uses: robinraju/release-downloader@v1.8
         with:
-          repository: mipt-golang-course/go-autotests
+          repository: rAch-kaplin/go-autotests
           latest: true
           fileName: "*"
           out-file-path: .tools

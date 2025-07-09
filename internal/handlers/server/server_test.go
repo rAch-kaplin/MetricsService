@@ -6,27 +6,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
-
-func setupTestRouter(storage ms.Collector) http.Handler {
-	r := chi.NewRouter()
-
-	r.Route("/", func(r chi.Router) {
-		r.Get("/", GetAllMetrics(storage))
-		r.Route("/", func(r chi.Router) {
-			r.Get("/value/{mType}/{mName}", GetMetric(storage))
-			r.Post("/update/{mType}/{mName}/{mValue}", UpdateMetric(storage))
-		})
-	})
-	return r
-}
 
 func TestUpdateMetric(t *testing.T) {
 	storage := ms.NewMemStorage()
-	router := setupTestRouter(storage)
+	router := NewRouter(storage)
 
 	tests := []struct {
 		name       string
@@ -95,9 +82,15 @@ func TestUpdateMetric(t *testing.T) {
 func TestGetMetric(t *testing.T) {
 	storage := ms.NewMemStorage()
 
-	storage.UpdateMetric(mtr.NewGauge("cpu_usage", 75.5))
-	storage.UpdateMetric(mtr.NewCounter("requests_total", 100))
-	router := setupTestRouter(storage)
+	if err := storage.UpdateMetric(mtr.GaugeType, "cpu_usage", 75.5); err != nil {
+		log.Error().Msgf("Failed to update metric cpu_usage: %v", err)
+	}
+
+	if err := storage.UpdateMetric(mtr.CounterType, "requests_total", int64(100)); err != nil {
+		log.Error().Msgf("Failed to update metric requests_total: %v", err)
+	}
+
+	router := NewRouter(storage)
 
 	tests := []struct {
 		name       string
