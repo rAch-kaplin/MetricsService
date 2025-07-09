@@ -50,6 +50,11 @@ func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 		mType := metric.Type()
 		mName := metric.Name()
 
+		metricJSON := server.Metrics{
+			ID:    mName,
+			MType: mType,
+		}
+
 		switch mType {
 		case mtr.GaugeType:
 			val, ok := metric.Value().(float64)
@@ -58,7 +63,9 @@ func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 					Msg("Invalid metric value type")
 				continue
 			}
-			sendMetric(client, mtr.GaugeType, mName, val)
+
+			metricJSON.Value = &val
+			sendMetric(client, &metricJSON)
 
 		case mtr.CounterType:
 			val, ok := metric.Value().(int64)
@@ -67,7 +74,9 @@ func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 					Msg("Invalid metric value type")
 				continue
 			}
-			sendMetric(client, mtr.CounterType, mName, val)
+
+			metricJSON.Delta = &val
+			sendMetric(client, &metricJSON)
 		}
 	}
 }

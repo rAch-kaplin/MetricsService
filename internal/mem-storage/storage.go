@@ -32,11 +32,7 @@ func (ms *MemStorage) UpdateMetric(mType, mName string, mValue any) error {
 	}
 
 	if oldMetric, ok := ms.storage[mType][mName]; ok {
-<<<<<<< HEAD
-		return oldMetric.Update(mName, mValue)
-=======
 		return oldMetric.Update(mValue)
->>>>>>> c8d8784 (first easyjson-JSON version)
 	}
 
 	var newMetric mtr.Metric

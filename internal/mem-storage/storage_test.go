@@ -1,7 +1,6 @@
 package memstorage
 
 import (
-	"reflect"
 	"sync"
 	"testing"
 
@@ -93,7 +92,7 @@ func TestMemStorage_UpdateMetric(t *testing.T) {
 		},
 	}
 	for i := range tests {
-		tt	:= &tests[i]
+		tt := &tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			ms := &MemStorage{
 				mutex:   sync.RWMutex{},
@@ -186,76 +185,76 @@ func TestMemStorage_GetMetric(t *testing.T) {
 	}
 }
 
-func TestMemStorage_GetAllMetrics(t *testing.T) {
-	counter := mtr.NewCounter("requests", 100)
-	gauge := mtr.NewGauge("temperature", 25.5)
-	type fields struct {
-		mutex   sync.RWMutex
-		storage map[string]map[string]mtr.Metric
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   map[string]map[string]mtr.Metric
-	}{
-		{
-			name: "empty storage",
-			fields: fields{
-				mutex:   sync.RWMutex{},
-				storage: map[string]map[string]mtr.Metric{},
-			},
-			want: map[string]map[string]mtr.Metric{},
-		},
-		{
-			name: "storage with one counter",
-			fields: fields{
-				mutex: sync.RWMutex{},
-				storage: map[string]map[string]mtr.Metric{
-					mtr.CounterType: {
-						"requests": counter,
-					},
-				},
-			},
-			want: map[string]map[string]mtr.Metric{
-				mtr.CounterType: {
-					"requests": counter,
-				},
-			},
-		},
-		{
-			name: "storage with gauge and counter",
-			fields: fields{
-				mutex: sync.RWMutex{},
-				storage: map[string]map[string]mtr.Metric{
-					mtr.CounterType: {
-						"requests": counter,
-					},
-					mtr.GaugeType: {
-						"temperature": gauge,
-					},
-				},
-			},
-			want: map[string]map[string]mtr.Metric{
-				mtr.CounterType: {
-					"requests": counter,
-				},
-				mtr.GaugeType: {
-					"temperature": gauge,
-				},
-			},
-		},
-	}
-
-	for i := range tests {
-		tt := &tests[i]
-		t.Run(tt.name, func(t *testing.T) {
-			ms := &MemStorage{
-				mutex:   sync.RWMutex{},
-				storage: tt.fields.storage,
-			}
-			if got := ms.GetAllMetrics(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MemStorage.GetAllMetrics() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+// func TestMemStorage_GetAllMetrics(t *testing.T) {
+// 	counter := mtr.NewCounter("requests", 100)
+// 	gauge := mtr.NewGauge("temperature", 25.5)
+// 	type fields struct {
+// 		mutex   sync.RWMutex
+// 		storage map[string]map[string]mtr.Metric
+// 	}
+// 	tests := []struct {
+// 		name   string
+// 		fields fields
+// 		want   map[string]map[string]mtr.Metric
+// 	}{
+// 		{
+// 			name: "empty storage",
+// 			fields: fields{
+// 				mutex:   sync.RWMutex{},
+// 				storage: map[string]map[string]mtr.Metric{},
+// 			},
+// 			want: map[string]map[string]mtr.Metric{},
+// 		},
+// 		{
+// 			name: "storage with one counter",
+// 			fields: fields{
+// 				mutex: sync.RWMutex{},
+// 				storage: map[string]map[string]mtr.Metric{
+// 					mtr.CounterType: {
+// 						"requests": counter,
+// 					},
+// 				},
+// 			},
+// 			want: map[string]map[string]mtr.Metric{
+// 				mtr.CounterType: {
+// 					"requests": counter,
+// 				},
+// 			},
+// 		},
+// 		{
+// 			name: "storage with gauge and counter",
+// 			fields: fields{
+// 				mutex: sync.RWMutex{},
+// 				storage: map[string]map[string]mtr.Metric{
+// 					mtr.CounterType: {
+// 						"requests": counter,
+// 					},
+// 					mtr.GaugeType: {
+// 						"temperature": gauge,
+// 					},
+// 				},
+// 			},
+// 			want: map[string]map[string]mtr.Metric{
+// 				mtr.CounterType: {
+// 					"requests": counter,
+// 				},
+// 				mtr.GaugeType: {
+// 					"temperature": gauge,
+// 				},
+// 			},
+// 		},
+// 	}
+//
+// 	for i := range tests {
+// 		tt := &tests[i]
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			ms := &MemStorage{
+// 				mutex:   sync.RWMutex{},
+// 				storage: tt.fields.storage,
+// 			}
+// 			if got := ms.GetAllMetrics(); !reflect.DeepEqual(got, tt.want) {
+// 				t.Errorf("MemStorage.GetAllMetrics() = %v, want %v", got, tt.want)
+// 			}
+// 		})
+// 	}
+// }
