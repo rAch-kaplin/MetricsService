@@ -49,7 +49,6 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 	allMetrics := storage.GetAllMetrics()
 
-<<<<<<< HEAD
 	for _, metric := range allMetrics {
 		mType := metric.Type()
 		mName := metric.Name()
@@ -66,38 +65,6 @@ func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 				log.Error().Str("metric_name", mName).Str("metric_type", mType).
 					Msg("Invalid metric value type")
 				continue
-=======
-	for mType, innerMap := range allMetrics {
-		for mName, metric := range innerMap {
-
-			metricJSON := server.Metrics{
-				ID:    metric.Name(),
-				MType: metric.Type(),
-			}
-
-			switch mType {
-			case mtr.GaugeType:
-				val, ok := metric.Value().(float64)
-				if !ok {
-					log.Error().Str("metric_name", mName).Str("metric_type", mType).
-						Msg("Invalid metric value type")
-					continue
-				}
-
-				metricJSON.Value = &val
-				sendMetric(client, &metricJSON)
-
-			case mtr.CounterType:
-				val, ok := metric.Value().(int64)
-				if !ok {
-					log.Error().Str("metric_name", mName).Str("metric_type", mType).
-						Msg("Invalid metric value type")
-					continue
-				}
-
-				metricJSON.Delta = &val
-				sendMetric(client, &metricJSON)
->>>>>>> c8d8784 (first easyjson-JSON version)
 			}
 
 			metricJSON.Value = &val
