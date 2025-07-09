@@ -13,14 +13,14 @@ type Collector interface {
 
 type MemStorage struct {
 	mutex    sync.RWMutex
-	gauges   map[string]float64
-	counters map[string]int64
+	Gauges   map[string]float64
+	Counters map[string]int64
 }
 
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		gauges:   make(map[string]float64),
-		counters: make(map[string]int64),
+		Gauges:   make(map[string]float64),
+		Counters: make(map[string]int64),
 	}
 }
 
@@ -54,13 +54,13 @@ func (ms *MemStorage) UpdateMetric(metric metrics.Metric) error {
 func (ms *MemStorage) UpdateGauge(metric metrics.Metric, value float64) {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
-	ms.gauges[metric.Name()] = value
+	ms.Gauges[metric.Name()] = value
 }
 
 func (ms *MemStorage) UpdateCounter(metric metrics.Metric, value int64) {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
-	ms.counters[metric.Name()] += value
+	ms.Counters[metric.Name()] += value
 }
 
 func (ms *MemStorage) GetMetric(metric metrics.Metric) (interface{}, error) {
@@ -91,8 +91,8 @@ func (ms *MemStorage) GetMetric(metric metrics.Metric) (interface{}, error) {
 func (ms *MemStorage) GetGauges(name string) (float64, bool) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
-
-	val, ok := ms.gauges[name]
+  
+	val, ok := ms.Gauges[name]
 	return val, ok
 }
 
@@ -100,6 +100,24 @@ func (ms *MemStorage) GetCounter(name string) (int64, bool) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
-	val, ok := ms.counters[name]
+	val, ok := ms.Counters[name]
 	return val, ok
 }
+
+func (ms *MemStorage) GetAllMetrics() (map[string]float64, map[string]int64) {
+	ms.mutex.RLock()
+	defer ms.mutex.RUnlock()
+
+	gaugesCopy := make(map[string]float64, len(ms.Gauges))
+	for name, value := range ms.Gauges {
+		gaugesCopy[name] = value
+	}
+
+	countersCopy := make(map[string]int64, len(ms.Counters))
+	for name, value := range ms.Counters {
+		countersCopy[name] = value
+	}
+
+	return gaugesCopy, countersCopy
+}
+
