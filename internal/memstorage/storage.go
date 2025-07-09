@@ -12,7 +12,6 @@ type Collector interface {
 	UpdateMetric(mtr metrics.Metric) error
 }
 
-
 type MemStorage struct {
 	mutex    sync.RWMutex
 	Gauges   map[string]float64

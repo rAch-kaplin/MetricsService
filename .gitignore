@@ -33,3 +33,4 @@ go.work.sum
 logFile.log
 cmd/server/server
 cmd/agent/agent
+

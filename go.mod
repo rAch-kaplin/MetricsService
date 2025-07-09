@@ -8,3 +8,4 @@ require (
 	github.com/stretchr/testify v1.10.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
 )
+

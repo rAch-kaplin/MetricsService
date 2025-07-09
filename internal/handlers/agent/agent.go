@@ -178,6 +178,7 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
             if stat.Type == mtr.GaugeType {
                 metric = mtr.NewGauge(stat.Name, float64(v))
             }
+
 		default:
 			log.Error("ERROR: Unknown type for metric %s: %T", stat.Name, value)
 			continue
