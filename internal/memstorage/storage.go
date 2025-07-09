@@ -7,7 +7,8 @@ import (
 )
 
 type Collector interface {
-	GetMetric(mtr metrics.Metric) (interface{}, error)
+	GetMetric(mType, mName string) (interface{}, bool)
+	GetAllMetrics() (map[string]float64, map[string]int64)
 	UpdateMetric(mtr metrics.Metric) error
 }
 
@@ -63,45 +64,26 @@ func (ms *MemStorage) UpdateCounter(metric metrics.Metric, value int64) {
 	ms.Counters[metric.Name()] += value
 }
 
-func (ms *MemStorage) GetMetric(metric metrics.Metric) (interface{}, error) {
-	switch metric.Type() {
-	case metrics.CounterType:
-		{
-			val, ok := ms.GetCounter(metric.Name())
-			if !ok {
-				return nil, metrics.ErrMetricsNotFound
-			}
+func (ms *MemStorage) GetMetric(mType, mName string) (interface{}, bool) {
+	ms.mutex.RLock()
+	defer ms.mutex.RUnlock()
 
-			return val, nil
-		}
+	switch mType {
 	case metrics.GaugeType:
 		{
-			val, ok := ms.GetGauges(metric.Name())
-			if !ok {
-				return nil, metrics.ErrMetricsNotFound
+			if val, ok := ms.Gauges[mName]; ok {
+				return val, true
 			}
-
-			return val, nil
 		}
-	default:
-		return nil, metrics.ErrInvalidMetricsType
+	case metrics.CounterType:
+		{
+			if val, ok := ms.Counters[mName]; ok {
+				return val, true
+			}
+		}
 	}
-}
 
-func (ms *MemStorage) GetGauges(name string) (float64, bool) {
-	ms.mutex.RLock()
-	defer ms.mutex.RUnlock()
-  
-	val, ok := ms.Gauges[name]
-	return val, ok
-}
-
-func (ms *MemStorage) GetCounter(name string) (int64, bool) {
-	ms.mutex.RLock()
-	defer ms.mutex.RUnlock()
-
-	val, ok := ms.Counters[name]
-	return val, ok
+	return nil, false
 }
 
 func (ms *MemStorage) GetAllMetrics() (map[string]float64, map[string]int64) {
@@ -120,4 +102,3 @@ func (ms *MemStorage) GetAllMetrics() (map[string]float64, map[string]int64) {
 
 	return gaugesCopy, countersCopy
 }
-

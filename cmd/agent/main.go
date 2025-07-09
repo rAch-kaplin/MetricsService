@@ -1,11 +1,12 @@
 package main
 
 import (
-	"net/http"
 	"time"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
+	"github.com/go-resty/resty/v2"
+
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/agent"
+	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/memstorage"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/logger"
 )
 
@@ -21,9 +22,7 @@ func main() {
 	log.Debug("START AGENT>")
 	storage := ms.NewMemStorage()
 
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
+	client := resty.New().SetTimeout(5 * time.Second)
 
 	go agent.CollectionLoop(storage, pollInterval)
 	go agent.ReportLoop(client, storage, reportInterval)
