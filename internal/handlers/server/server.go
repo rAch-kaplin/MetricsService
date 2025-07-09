@@ -186,6 +186,7 @@ func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
 		mValue := chi.URLParam(req, "mValue")
+    
 		log.Debug().
 			Str("metric_type", mType).
 			Str("metric_name", mName).
