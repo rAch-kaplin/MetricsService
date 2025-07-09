@@ -11,7 +11,6 @@ type Collector interface {
 	UpdateMetric(mtr metrics.Metric) error
 }
 
-
 type MemStorage struct {
 	mutex    sync.RWMutex
 	Gauges   map[string]float64
@@ -92,7 +91,7 @@ func (ms *MemStorage) GetMetric(metric metrics.Metric) (interface{}, error) {
 func (ms *MemStorage) GetGauges(name string) (float64, bool) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
-
+  
 	val, ok := ms.Gauges[name]
 	return val, ok
 }
@@ -121,3 +120,4 @@ func (ms *MemStorage) GetAllMetrics() (map[string]float64, map[string]int64) {
 
 	return gaugesCopy, countersCopy
 }
+
