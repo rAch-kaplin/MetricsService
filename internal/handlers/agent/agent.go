@@ -137,19 +137,3 @@ func ConvertToGzipData(metricJSON *server.Metrics) (*bytes.Buffer, error) {
 
 	return &buf, nil
 }
-
-// func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
-// 	log.Debug().Msg("collectionLoop ...")
-// 	for {
-// 		UpdateAllMetrics(storage)
-// 		time.Sleep(interval)
-// 	}
-// }
-//
-// func ReportLoop(client *resty.Client, storage *ms.MemStorage, interval time.Duration) {
-// 	log.Debug().Msg("reportLoop ...")
-// 	for {
-// 		sendAllMetrics(client, storage)
-// 		time.Sleep(interval)
-// 	}
-// }

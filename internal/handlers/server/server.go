@@ -27,30 +27,6 @@ type MetricTable struct {
 	Value string
 }
 
-// func NewRouter(storage ms.Collector) http.Handler {
-// 	r := chi.NewRouter()
-//
-// 	r.Use(WithLogging)
-// 	r.Use(WithGzipCompress)
-//
-// 	r.Route("/", func(r chi.Router) {
-// 		r.Get("/", GetAllMetrics(storage))
-// 		r.Route("/update", func(r chi.Router) {
-// 			r.Post("/", UpdateMetricsHandlerJSON(storage))
-// 			r.Post("/{mType}/{mName}/{mValue}", UpdateMetric(storage))
-//
-// 			if
-// 		})
-//
-// 		r.Route("/value", func(r chi.Router) {
-// 			r.Post("/", GetMetricsHandlerJSON(storage))
-// 			r.Get("/{mType}/{mName}", GetMetric(storage))
-// 		})
-// 	})
-//
-// 	return r
-// }
-
 func ConvertByType(mType, mValue string) (any, error) {
 	switch mType {
 	case mtr.GaugeType:

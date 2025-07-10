@@ -135,7 +135,6 @@ func NewRouter(storage ms.Collector, opts *options) http.Handler {
 	return r
 }
 
-
 func startServer(opts *options) error {
 	log.Info().
 		Str("address", opts.endPointAddr).

@@ -7,20 +7,21 @@ import (
 )
 
 type Collector interface {
-	GetMetric(mtr metrics.Metric) (interface{}, error)
+	GetMetric(mType, mName string) (interface{}, bool)
+	GetAllMetrics() (map[string]float64, map[string]int64)
 	UpdateMetric(mtr metrics.Metric) error
 }
 
 type MemStorage struct {
 	mutex    sync.RWMutex
-	gauges   map[string]float64
-	counters map[string]int64
+	Gauges   map[string]float64
+	Counters map[string]int64
 }
 
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		gauges:   make(map[string]float64),
-		counters: make(map[string]int64),
+		Gauges:   make(map[string]float64),
+		Counters: make(map[string]int64),
 	}
 }
 
@@ -54,52 +55,50 @@ func (ms *MemStorage) UpdateMetric(metric metrics.Metric) error {
 func (ms *MemStorage) UpdateGauge(metric metrics.Metric, value float64) {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
-	ms.gauges[metric.Name()] = value
+	ms.Gauges[metric.Name()] = value
 }
 
 func (ms *MemStorage) UpdateCounter(metric metrics.Metric, value int64) {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
-	ms.counters[metric.Name()] += value
+	ms.Counters[metric.Name()] += value
 }
 
-func (ms *MemStorage) GetMetric(metric metrics.Metric) (interface{}, error) {
-	switch metric.Type() {
-	case metrics.CounterType:
-		{
-			val, ok := ms.GetCounter(metric.Name())
-			if !ok {
-				return nil, metrics.ErrMetricsNotFound
-			}
+func (ms *MemStorage) GetMetric(mType, mName string) (interface{}, bool) {
+	ms.mutex.RLock()
+	defer ms.mutex.RUnlock()
 
-			return val, nil
-		}
+	switch mType {
 	case metrics.GaugeType:
 		{
-			val, ok := ms.GetGauges(metric.Name())
-			if !ok {
-				return nil, metrics.ErrMetricsNotFound
+			if val, ok := ms.Gauges[mName]; ok {
+				return val, true
 			}
-
-			return val, nil
 		}
-	default:
-		return nil, metrics.ErrInvalidMetricsType
+	case metrics.CounterType:
+		{
+			if val, ok := ms.Counters[mName]; ok {
+				return val, true
+			}
+		}
 	}
+
+	return nil, false
 }
 
-func (ms *MemStorage) GetGauges(name string) (float64, bool) {
+func (ms *MemStorage) GetAllMetrics() (map[string]float64, map[string]int64) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
-	val, ok := ms.gauges[name]
-	return val, ok
-}
+	gaugesCopy := make(map[string]float64, len(ms.Gauges))
+	for name, value := range ms.Gauges {
+		gaugesCopy[name] = value
+	}
 
-func (ms *MemStorage) GetCounter(name string) (int64, bool) {
-	ms.mutex.RLock()
-	defer ms.mutex.RUnlock()
+	countersCopy := make(map[string]int64, len(ms.Counters))
+	for name, value := range ms.Counters {
+		countersCopy[name] = value
+	}
 
-	val, ok := ms.counters[name]
-	return val, ok
+	return gaugesCopy, countersCopy
 }
