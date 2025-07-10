@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -8,7 +10,9 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/mailru/easyjson"
 
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
@@ -29,9 +33,11 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 				Str("type", fmt.Sprintf("%T", val)).
 				Msg("Failed to update runtime metric")
 		}
+
+		log.Debug().Msgf("update metric %s", stat.Name)
 	}
 
-	if err := storage.UpdateMetric(mtr.CounterType, "PollCount", 1); err != nil {
+	if err := storage.UpdateMetric(mtr.CounterType, "PollCount", int64(1)); err != nil {
 		log.Error().Msgf("Failed to update PollCount metric: %v", err)
 	}
 
@@ -47,6 +53,11 @@ func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 		mType := metric.Type()
 		mName := metric.Name()
 
+		metricJSON := server.Metrics{
+			ID:    mName,
+			MType: mType,
+		}
+
 		switch mType {
 		case mtr.GaugeType:
 			val, ok := metric.Value().(float64)
@@ -55,7 +66,9 @@ func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 					Msg("Invalid metric value type")
 				continue
 			}
-			sendMetric(client, mtr.GaugeType, mName, val)
+
+			metricJSON.Value = &val
+			sendMetric(client, &metricJSON)
 
 		case mtr.CounterType:
 			val, ok := metric.Value().(int64)
@@ -64,29 +77,65 @@ func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 					Msg("Invalid metric value type")
 				continue
 			}
-			sendMetric(client, mtr.CounterType, mName, val)
+
+			metricJSON.Delta = &val
+			sendMetric(client, &metricJSON)
 		}
 	}
 }
 
-func sendMetric(client *resty.Client, mType string, mName string, mValue interface{}) {
-	res, err := client.R().
-		SetHeader("Content-Type", "text/plain").
-		SetPathParams(map[string]string{
-			"mType":  mType,
-			"mName":  mName,
-			"mValue": fmt.Sprintf("%v", mValue),
-		}).
-		Post("update/{mType}/{mName}/{mValue}")
+func sendMetric(client *resty.Client, metricJSON *server.Metrics) {
+	backoffSchedule := []time.Duration{
+		100 * time.Millisecond,
+		500 * time.Millisecond,
+		1 * time.Second,
+	}
 
+	// buf, err := ConvertToGzipData(metricJSON)
+	// if err != nil {
+	// 	log.Error().Err(err).Msg("Failed to convert metric to gzip")
+	// 	return
+	// }
+
+	for _, backoff := range backoffSchedule {
+		res, err := client.R().
+			SetHeader("Content-Type", "application/json").
+			SetHeader("Content-Encoding", "gzip").
+			SetBody(metricJSON).
+			Post("update/")
+
+		if err != nil || res.StatusCode() != http.StatusOK {
+		} else {
+			break
+		}
+
+		time.Sleep(backoff)
+	}
+}
+
+func ConvertToGzipData(metricJSON *server.Metrics) (*bytes.Buffer, error) {
+	jsonData, err := easyjson.Marshal(*metricJSON)
 	if err != nil {
-		log.Error().Msgf("Error creating a request for %s: %v", mName, err)
-		return
+		log.Error().Err(err).Msg("Failed to marshal metricJSON")
+		return nil, err
 	}
 
-	if res.StatusCode() != http.StatusOK {
-		log.Error().Msgf("Server returned non-OK status for %s/%s: %d %s", mType, mName, res.StatusCode(), res.String())
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	defer func() {
+		err := gz.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to close gzip writer")
+		}
+	}()
+
+	_, err = gz.Write(jsonData)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to write gzip data")
+		return nil, err
 	}
+
+	return &buf, nil
 }
 
 func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
@@ -100,7 +149,7 @@ func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
 func ReportLoop(client *resty.Client, storage *ms.MemStorage, interval time.Duration) {
 	log.Debug().Msg("reportLoop ...")
 	for {
-		time.Sleep(interval)
 		sendAllMetrics(client, storage)
+		time.Sleep(interval)
 	}
 }

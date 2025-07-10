@@ -32,7 +32,7 @@ func (ms *MemStorage) UpdateMetric(mType, mName string, mValue any) error {
 	}
 
 	if oldMetric, ok := ms.storage[mType][mName]; ok {
-		return oldMetric.Update(mName, mValue)
+		return oldMetric.Update(mValue)
 	}
 
 	var newMetric mtr.Metric
