@@ -46,7 +46,7 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 	}
 }
 
-func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
+func SendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 	allMetrics := storage.GetAllMetrics()
 
 	for _, metric := range allMetrics {
@@ -138,18 +138,18 @@ func ConvertToGzipData(metricJSON *server.Metrics) (*bytes.Buffer, error) {
 	return &buf, nil
 }
 
-func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
-	log.Debug().Msg("collectionLoop ...")
-	for {
-		UpdateAllMetrics(storage)
-		time.Sleep(interval)
-	}
-}
-
-func ReportLoop(client *resty.Client, storage *ms.MemStorage, interval time.Duration) {
-	log.Debug().Msg("reportLoop ...")
-	for {
-		sendAllMetrics(client, storage)
-		time.Sleep(interval)
-	}
-}
+// func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
+// 	log.Debug().Msg("collectionLoop ...")
+// 	for {
+// 		UpdateAllMetrics(storage)
+// 		time.Sleep(interval)
+// 	}
+// }
+//
+// func ReportLoop(client *resty.Client, storage *ms.MemStorage, interval time.Duration) {
+// 	log.Debug().Msg("reportLoop ...")
+// 	for {
+// 		sendAllMetrics(client, storage)
+// 		time.Sleep(interval)
+// 	}
+// }

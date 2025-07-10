@@ -27,24 +27,29 @@ type MetricTable struct {
 	Value string
 }
 
-func NewRouter(storage ms.Collector) http.Handler {
-	r := chi.NewRouter()
-
-	r.Use(WithLogging)
-	r.Use(WithGzipCompress)
-
-	r.Route("/", func(r chi.Router) {
-		r.Get("/", GetAllMetrics(storage))
-		r.Route("/", func(r chi.Router) {
-			r.Post("/update/", UpdateMetricsHandlerJSON(storage))
-			r.Post("/value/", GetMetricsHandlerJSON(storage))
-			r.Get("/value/{mType}/{mName}", GetMetric(storage))
-			r.Post("/update/{mType}/{mName}/{mValue}", UpdateMetric(storage))
-		})
-	})
-
-	return r
-}
+// func NewRouter(storage ms.Collector) http.Handler {
+// 	r := chi.NewRouter()
+//
+// 	r.Use(WithLogging)
+// 	r.Use(WithGzipCompress)
+//
+// 	r.Route("/", func(r chi.Router) {
+// 		r.Get("/", GetAllMetrics(storage))
+// 		r.Route("/update", func(r chi.Router) {
+// 			r.Post("/", UpdateMetricsHandlerJSON(storage))
+// 			r.Post("/{mType}/{mName}/{mValue}", UpdateMetric(storage))
+//
+// 			if
+// 		})
+//
+// 		r.Route("/value", func(r chi.Router) {
+// 			r.Post("/", GetMetricsHandlerJSON(storage))
+// 			r.Get("/{mType}/{mName}", GetMetric(storage))
+// 		})
+// 	})
+//
+// 	return r
+// }
 
 func ConvertByType(mType, mValue string) (any, error) {
 	switch mType {
@@ -247,6 +252,7 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		var metric Metrics
 
+		log.Info().Msg("GetMetricsHandlerJSON called\n\n")
 		if req.Header.Get("Content-Type") != "application/json" {
 			http.Error(resp, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -256,6 +262,7 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			http.Error(resp, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
 			return
 		}
+		log.Info().Msgf("Received metric request: %+v", metric)
 
 		if !FillMetricValueFromStorage(storage, &metric) {
 			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
@@ -267,6 +274,7 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			http.Error(resp, fmt.Sprintf("failed to encode json: %v", err), http.StatusInternalServerError)
 			return
 		}
+		log.Info().Msg("Metric successfully returned\n\n")
 	}
 }
 
@@ -307,3 +315,4 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 		}
 	}
 }
+

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/caarlos0/env/v6"
@@ -102,8 +104,24 @@ func startAgent() {
 
 	log.Info().Msg("Starting collection and reporting loops")
 
-	go agent.CollectionLoop(storage, time.Duration(opts.pollInterval)*time.Second)
-	go agent.ReportLoop(client, storage, time.Duration(opts.reportInterval)*time.Second)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-	select {}
+	pollTimer := time.NewTicker(time.Duration(opts.pollInterval) * time.Second)
+	reportTimer := time.NewTicker(time.Duration(opts.reportInterval) * time.Second)
+
+	defer pollTimer.Stop()
+	defer reportTimer.Stop()
+
+	for {
+		select {
+		case <-stop:
+			return
+
+		case <-pollTimer.C:
+			agent.UpdateAllMetrics(storage)
+		case <-reportTimer.C:
+			agent.SendAllMetrics(client, storage)
+		}
+	}
 }
