@@ -1,5 +1,13 @@
 package config
 
+import (
+	"fmt"
+	"net"
+
+	"github.com/caarlos0/env/v6"
+	"github.com/spf13/cobra"
+)
+
 const (
 	DefaultEndpoint        = "localhost:8080"
 	DefaultStoreInterval   = 300
@@ -21,7 +29,7 @@ type EnvConfig struct {
 	RestoreOnStart  bool   `env:"RESTORE"`
 }
 
-func NewOptions(envOpts, flagOpts []func(*Options)) *Options {
+func NewServerOptions(envOpts, flagOpts []func(*Options)) *Options {
 	opts := &Options{
 		EndPointAddr:    DefaultEndpoint,
 		StoreInterval:   DefaultStoreInterval,
@@ -62,4 +70,58 @@ func WithRestoreOnStart(restore bool) func(*Options) {
 	return func(o *Options) {
 		o.RestoreOnStart = restore
 	}
+}
+
+func ParseOptionsFromCmd(cmd *cobra.Command, endPointAddr string, storeInterval int, fileStoragePath string, restoreOnStart bool) (*Options, error) {
+	var envCfg EnvConfig
+	if err := env.Parse(&envCfg); err != nil {
+		return nil, fmt.Errorf("failed to parse environment: %w", err)
+	}
+
+	var envOpts []func(*Options)
+
+	if envCfg.EndPointAddr != "" {
+		envOpts = append(envOpts, WithAddress(envCfg.EndPointAddr))
+	}
+	if envCfg.StoreInterval < 0 {
+		return nil, fmt.Errorf("store interval must be >= 0, got %d", envCfg.StoreInterval)
+	} else {
+		envOpts = append(envOpts, WithStoreInterval(envCfg.StoreInterval))
+	}
+	if envCfg.FileStoragePath != "" {
+		envOpts = append(envOpts, WithFileStoragePath(envCfg.FileStoragePath))
+	}
+	envOpts = append(envOpts, WithRestoreOnStart(envCfg.RestoreOnStart))
+
+	var flagOpts []func(*Options)
+
+	if cmd.Flags().Changed("a") {
+		flagOpts = append(flagOpts, WithAddress(endPointAddr))
+	}
+
+	if cmd.Flags().Changed("i") {
+		if storeInterval < 0 {
+			return nil, fmt.Errorf("store interval flag must be >= 0, got %d", storeInterval)
+		}
+		flagOpts = append(flagOpts, WithStoreInterval(storeInterval))
+	}
+
+	if cmd.Flags().Changed("f") {
+		if fileStoragePath == "" {
+			return nil, fmt.Errorf("file storage path flag cannot be empty")
+		}
+		flagOpts = append(flagOpts, WithFileStoragePath(fileStoragePath))
+	}
+
+	if cmd.Flags().Changed("r") {
+		flagOpts = append(flagOpts, WithRestoreOnStart(restoreOnStart))
+	}
+
+	opts := NewServerOptions(envOpts, flagOpts)
+
+	if _, _, err := net.SplitHostPort(opts.EndPointAddr); err != nil {
+		return nil, fmt.Errorf("invalid address %s: %w", opts.EndPointAddr, err)
+	}
+
+	return opts, nil
 }
