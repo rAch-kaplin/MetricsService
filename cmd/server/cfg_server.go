@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,12 +11,13 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/spf13/cobra"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
-	db "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/data-base"
+	database "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/data-base"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -24,6 +26,7 @@ var (
 	storeInterval   int
 	fileStoragePath string
 	restoreOnStart  bool
+	dataBaseDSN     string
 	opts            *config.Options
 )
 
@@ -34,7 +37,7 @@ var rootCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
-		opts, err = config.ParseOptionsFromCmd(cmd, endPointAddr, storeInterval, fileStoragePath, restoreOnStart)
+		opts, err = config.ParseOptionsFromCmd(cmd, endPointAddr, storeInterval, fileStoragePath, restoreOnStart, dataBaseDSN)
 		return err
 	},
 
@@ -50,6 +53,14 @@ var rootCmd = &cobra.Command{
 			}
 		}()
 
+		log.Info().Msgf("DSN: %q", opts.DataBaseDSN)
+		db, err := sql.Open("pgx", opts.DataBaseDSN)
+		if err != nil {
+			log.Error().Err(err).Msg("sql.Open error")
+			panic(err)
+		}
+		defer db.Close()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -58,7 +69,7 @@ var rootCmd = &cobra.Command{
 
 		serverErrCh := make(chan error, 1)
 		go func() {
-			serverErrCh <- startServer(ctx, opts)
+			serverErrCh <- startServer(ctx, opts, db)
 		}()
 
 		select {
@@ -78,18 +89,19 @@ func init() {
 	rootCmd.Flags().IntVarP(&storeInterval, "i", "i", config.DefaultStoreInterval, "store interval in seconds (0 = sync)")
 	rootCmd.Flags().StringVarP(&fileStoragePath, "f", "f", config.DefaultFileStoragePath, "file to store metrics")
 	rootCmd.Flags().BoolVarP(&restoreOnStart, "r", "r", config.DefaultRestoreOnStart, "restore metrics from file on start")
+	rootCmd.Flags().StringVarP(&dataBaseDSN, "d", "d", config.DefaultDataBaseDSN, "database dsn")
 }
 
-func startServer(ctx context.Context, opts *config.Options) error {
+func startServer(ctx context.Context, opts *config.Options, db *sql.DB) error {
 	log.Info().
 		Str("address", opts.EndPointAddr).
 		Msg("Server configuration")
 
 	storage := ms.NewMemStorage()
-	r := router.NewRouter(storage, opts)
+	r := router.NewRouter(storage, opts, db)
 
 	if opts.RestoreOnStart {
-		if err := db.LoadFromDB(storage, opts.FileStoragePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := database.LoadFromDB(storage, opts.FileStoragePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("LoadFromDB error %w", err)
 		}
 	}
@@ -105,12 +117,12 @@ func startServer(ctx context.Context, opts *config.Options) error {
 			for {
 				select {
 				case <-ticker.C:
-					if err := db.SaveToDB(storage, opts.FileStoragePath); err != nil {
+					if err := database.SaveToDB(storage, opts.FileStoragePath); err != nil {
 						log.Error().Err(err).Msg("failed to save DB")
 					}
 				case <-ctx.Done():
 					log.Info().Msg("Shutting down server, saving metrics")
-					if err := db.SaveToDB(storage, opts.FileStoragePath); err != nil {
+					if err := database.SaveToDB(storage, opts.FileStoragePath); err != nil {
 						log.Error().Err(err).Msg("Failed to save metrics during shutdown")
 					}
 					return

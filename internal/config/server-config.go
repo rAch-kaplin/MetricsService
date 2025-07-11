@@ -13,6 +13,7 @@ const (
 	DefaultStoreInterval   = 300
 	DefaultFileStoragePath = "/temp/metrics-db.json"
 	DefaultRestoreOnStart  = true
+	DefaultDataBaseDSN     = ""
 )
 
 type Options struct {
@@ -20,6 +21,7 @@ type Options struct {
 	StoreInterval   int
 	FileStoragePath string
 	RestoreOnStart  bool
+	DataBaseDSN     string
 }
 
 type EnvConfig struct {
@@ -27,6 +29,7 @@ type EnvConfig struct {
 	StoreInterval   int    `env:"STORE_INTERVAL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	RestoreOnStart  bool   `env:"RESTORE"`
+	DataBaseDSN     string `env:"DATABASE_DSN"`
 }
 
 func NewServerOptions(envOpts, flagOpts []func(*Options)) *Options {
@@ -72,14 +75,23 @@ func WithRestoreOnStart(restore bool) func(*Options) {
 	}
 }
 
-func ParseOptionsFromCmd(cmd *cobra.Command, endPointAddr string, storeInterval int, fileStoragePath string, restoreOnStart bool) (*Options, error) {
+func WithDataBaseDSN(dataBaseDSN string) func(*Options) {
+	return func(o *Options) {
+		o.DataBaseDSN = dataBaseDSN
+	}
+}
+
+func ParseOptionsFromCmd(cmd *cobra.Command, endPointAddr string, storeInterval int, fileStoragePath string,
+							restoreOnStart bool, dataBaseDSN string) (*Options, error) {
 	var envCfg EnvConfig
 	if err := env.Parse(&envCfg); err != nil {
 		return nil, fmt.Errorf("failed to parse environment: %w", err)
 	}
 
 	var envOpts []func(*Options)
-
+	if envCfg.DataBaseDSN != "" {
+		envOpts = append(envOpts, WithDataBaseDSN(envCfg.DataBaseDSN))
+	}
 	if envCfg.EndPointAddr != "" {
 		envOpts = append(envOpts, WithAddress(envCfg.EndPointAddr))
 	}
@@ -94,7 +106,9 @@ func ParseOptionsFromCmd(cmd *cobra.Command, endPointAddr string, storeInterval 
 	envOpts = append(envOpts, WithRestoreOnStart(envCfg.RestoreOnStart))
 
 	var flagOpts []func(*Options)
-
+	if cmd.Flags().Changed("d") {
+		flagOpts = append(flagOpts, WithDataBaseDSN(dataBaseDSN))
+	}
 	if cmd.Flags().Changed("a") {
 		flagOpts = append(flagOpts, WithAddress(endPointAddr))
 	}
