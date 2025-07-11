@@ -14,70 +14,65 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/spf13/cobra"
 
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	db "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/data-base"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
-const (
-	defaultEndpoint        = "localhost:8080"
-	defaultStoreInterval   = 300
-	defaultFileStoragePath = "/temp/metrics-db.json"
-	defaultRestoreOnStart  = true
-)
-
-type options struct {
+var (
 	endPointAddr    string
 	storeInterval   int
 	fileStoragePath string
 	restoreOnStart  bool
-}
-
-type envConfig struct {
-	EndPointAddr    string `env:"ADDRESS"`
-	StoreInterval   int    `env:"STORE_INTERVAL"`
-	FileStoragePath string `env:"FILE_STORAGE_PATH"`
-	RestoreOnStart  bool   `env:"RESTORE"`
-}
-
-var opts = &options{
-	endPointAddr:    defaultEndpoint,
-	storeInterval:   defaultStoreInterval,
-	fileStoragePath: defaultFileStoragePath,
-	restoreOnStart:  defaultRestoreOnStart,
-}
+	opts            *config.Options
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "server",
 	Short: "MetricService",
 	Long:  "MetricService",
 	Args:  cobra.NoArgs,
-
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		var cfg envConfig
-		err := env.Parse(&cfg)
-		if err != nil {
-			return fmt.Errorf("poll and report intervals must be > 0")
+		var envCfg config.EnvConfig
+		if err := env.Parse(&envCfg); err != nil {
+			return fmt.Errorf("failed to parse environment: %w", err)
 		}
 
-		if cfg.EndPointAddr != "" {
-			opts.endPointAddr = cfg.EndPointAddr
+		var envOpts []func(*config.Options)
+
+		if envCfg.EndPointAddr != "" {
+			envOpts = append(envOpts, config.WithAddress(envCfg.EndPointAddr))
+		}
+		if envCfg.StoreInterval != 0 {
+			envOpts = append(envOpts, config.WithStoreInterval(envCfg.StoreInterval))
+		}
+		if envCfg.FileStoragePath != "" {
+			envOpts = append(envOpts, config.WithFileStoragePath(envCfg.FileStoragePath))
+		}
+		envOpts = append(envOpts, config.WithRestoreOnStart(envCfg.RestoreOnStart))
+
+		var flagOpts []func(*config.Options)
+
+		if cmd.Flags().Changed("a") {
+			flagOpts = append(flagOpts, config.WithAddress(endPointAddr))
+		}
+		if cmd.Flags().Changed("i") {
+			flagOpts = append(flagOpts, config.WithStoreInterval(storeInterval))
+		}
+		if cmd.Flags().Changed("f") {
+			flagOpts = append(flagOpts, config.WithFileStoragePath(fileStoragePath))
+		}
+		if cmd.Flags().Changed("r") {
+			flagOpts = append(flagOpts, config.WithRestoreOnStart(restoreOnStart))
 		}
 
-		if _, _, err := net.SplitHostPort(opts.endPointAddr); err != nil {
-			return fmt.Errorf("invalid address %s: %w", opts.endPointAddr, err)
-		}
+		opts = config.NewOptions(envOpts, flagOpts)
 
-		if cfg.FileStoragePath != "" {
-			opts.fileStoragePath = cfg.FileStoragePath
+		if _, _, err := net.SplitHostPort(opts.EndPointAddr); err != nil {
+			return fmt.Errorf("invalid address %s: %w", opts.EndPointAddr, err)
 		}
-
-		if cfg.StoreInterval != 0 {
-			opts.storeInterval = cfg.StoreInterval
-		}
-
-		opts.restoreOnStart = cfg.RestoreOnStart
 
 		return nil
 	},
@@ -103,13 +98,13 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&opts.endPointAddr, "a", "a", defaultEndpoint, "endpoint HTTP-server addr")
-	rootCmd.Flags().IntVarP(&opts.storeInterval, "i", "i", defaultStoreInterval, "store interval in seconds (0 = sync)")
-	rootCmd.Flags().StringVarP(&opts.fileStoragePath, "f", "f", defaultFileStoragePath, "file to store metrics")
-	rootCmd.Flags().BoolVarP(&opts.restoreOnStart, "r", "r", defaultRestoreOnStart, "restore metrics from file on start")
+	rootCmd.Flags().StringVarP(&endPointAddr, "a", "a", config.DefaultEndpoint, "endpoint HTTP-server addr")
+	rootCmd.Flags().IntVarP(&storeInterval, "i", "i", config.DefaultStoreInterval, "store interval in seconds (0 = sync)")
+	rootCmd.Flags().StringVarP(&fileStoragePath, "f", "f", config.DefaultFileStoragePath, "file to store metrics")
+	rootCmd.Flags().BoolVarP(&restoreOnStart, "r", "r", config.DefaultRestoreOnStart, "restore metrics from file on start")
 }
 
-func NewRouter(storage ms.Collector, opts *options) http.Handler {
+func NewRouter(storage ms.Collector, opts *config.Options) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(server.WithLogging)
@@ -118,8 +113,8 @@ func NewRouter(storage ms.Collector, opts *options) http.Handler {
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", server.GetAllMetrics(storage))
 		r.Route("/update", func(r chi.Router) {
-			if opts.storeInterval == 0 {
-				r.Use(db.WithSaveToDB(storage, opts.fileStoragePath))
+			if opts.StoreInterval == 0 {
+				r.Use(db.WithSaveToDB(storage, opts.FileStoragePath))
 			}
 
 			r.Post("/", server.UpdateMetricsHandlerJSON(storage))
@@ -135,22 +130,22 @@ func NewRouter(storage ms.Collector, opts *options) http.Handler {
 	return r
 }
 
-func startServer(opts *options) error {
+func startServer(opts *config.Options) error {
 	log.Info().
-		Str("address", opts.endPointAddr).
+		Str("address", opts.EndPointAddr).
 		Msg("Server configuration")
 
 	storage := ms.NewMemStorage()
 	r := NewRouter(storage, opts)
 
-	if opts.restoreOnStart {
-		if err := db.LoadFromDB(storage, opts.fileStoragePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if opts.RestoreOnStart {
+		if err := db.LoadFromDB(storage, opts.FileStoragePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("LoadFromDB error %w", err)
 		}
 	}
 
 	go func() {
-		ticker := time.NewTicker(time.Duration(opts.storeInterval) * time.Second)
+		ticker := time.NewTicker(time.Duration(opts.StoreInterval) * time.Second)
 		defer ticker.Stop()
 
 		stop := make(chan os.Signal, 1)
@@ -159,12 +154,12 @@ func startServer(opts *options) error {
 		for {
 			select {
 			case <-ticker.C:
-				if err := db.SaveToDB(storage, opts.fileStoragePath); err != nil {
+				if err := db.SaveToDB(storage, opts.FileStoragePath); err != nil {
 					log.Error().Err(err).Msg("failed to save DB")
 				}
 			case <-stop:
 				log.Info().Msg("Shutting down server, saving metrics")
-				if err := db.SaveToDB(storage, opts.fileStoragePath); err != nil {
+				if err := db.SaveToDB(storage, opts.FileStoragePath); err != nil {
 					log.Error().Err(err).Msg("Failed to save metrics during shutdown")
 				}
 				os.Exit(0)
@@ -172,7 +167,7 @@ func startServer(opts *options) error {
 		}
 	}()
 
-	if err := http.ListenAndServe(opts.endPointAddr, r); err != nil {
+	if err := http.ListenAndServe(opts.EndPointAddr, r); err != nil {
 		fmt.Fprintf(os.Stderr, "HTTP-server didn't start: %v", err)
 		panic(err)
 	}
