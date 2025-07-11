@@ -27,6 +27,7 @@ test:
 	@go test ./... -v
 
 lint:
+	@go mod download
 	@golangci-lint run
 
 clean:
