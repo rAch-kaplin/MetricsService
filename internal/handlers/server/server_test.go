@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"

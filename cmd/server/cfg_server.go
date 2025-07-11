@@ -115,9 +115,6 @@ func startServer(ctx context.Context, opts *config.Options, db *sql.DB) error {
 			ticker := time.NewTicker(time.Duration(opts.StoreInterval) * time.Second)
 			defer ticker.Stop()
 
-			stop := make(chan os.Signal, 1)
-			signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
-
 			for {
 				select {
 				case <-ticker.C:
