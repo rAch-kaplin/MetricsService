@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -79,7 +80,18 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("invalid address %s: %w", opts.endPointAddr, err)
 		}
 
-		startAgent()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+		go func(){
+			<-stop
+			cancel()
+		}()
+
+		startAgent(ctx)
 
 		return nil
 	},
@@ -95,7 +107,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&opts.reportInterval, "r", "r", opts.reportInterval, "PollInterval value")
 }
 
-func startAgent() {
+func startAgent(ctx context.Context) {
 	storage := ms.NewMemStorage()
 
 	client := resty.New().
@@ -103,9 +115,6 @@ func startAgent() {
 		SetBaseURL("http://" + opts.endPointAddr)
 
 	log.Info().Msg("Starting collection and reporting loops")
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	pollTimer := time.NewTicker(time.Duration(opts.pollInterval) * time.Second)
 	reportTimer := time.NewTicker(time.Duration(opts.reportInterval) * time.Second)
@@ -115,7 +124,7 @@ func startAgent() {
 
 	for {
 		select {
-		case <-stop:
+		case <-ctx.Done():
 			return
 
 		case <-pollTimer.C:

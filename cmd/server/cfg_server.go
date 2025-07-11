@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -49,11 +50,26 @@ var rootCmd = &cobra.Command{
 			}
 		}()
 
-		if err := startServer(opts); err != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+		serverErrCh := make(chan error, 1)
+		go func() {
+			serverErrCh <- startServer(ctx, opts)
+		}()
+
+		select {
+		case sig := <-stop:
+			log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
+			cancel()
+			err := <-serverErrCh
+			return err
+		case err := <-serverErrCh:
 			return err
 		}
-
-		return nil
 	},
 }
 
@@ -64,7 +80,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&restoreOnStart, "r", "r", config.DefaultRestoreOnStart, "restore metrics from file on start")
 }
 
-func startServer(opts *config.Options) error {
+func startServer(ctx context.Context, opts *config.Options) error {
 	log.Info().
 		Str("address", opts.EndPointAddr).
 		Msg("Server configuration")
@@ -92,23 +108,39 @@ func startServer(opts *config.Options) error {
 					if err := db.SaveToDB(storage, opts.FileStoragePath); err != nil {
 						log.Error().Err(err).Msg("failed to save DB")
 					}
-				case <-stop:
+				case <-ctx.Done():
 					log.Info().Msg("Shutting down server, saving metrics")
 					if err := db.SaveToDB(storage, opts.FileStoragePath); err != nil {
 						log.Error().Err(err).Msg("Failed to save metrics during shutdown")
 					}
-					os.Exit(0)
+					return
 				}
 			}
 		}()
 	}
 
-	log.Info().Msg("Starting HTTP server...")
-	if err := http.ListenAndServe(opts.EndPointAddr, r); err != nil {
-		log.Error().Err(err).Msg("HTTP server failed to start")
-		fmt.Fprintf(os.Stderr, "HTTP-server didn't start: %v", err)
-		panic(err)
+	srv := &http.Server{
+		Addr:    opts.EndPointAddr,
+		Handler: r,
 	}
+
+	go func() {
+		log.Info().Msg("Starting HTTP server...")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("HTTP server failed unexpectedly")
+		}
+	}()
+
+	<-ctx.Done()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Error().Err(err).Msg("Failed to gracefully shutdown server")
+		return err
+	}
+
+	log.Info().Msg("Server gracefully stopped")
 
 	return nil
 }
