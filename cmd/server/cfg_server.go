@@ -78,30 +78,34 @@ func startServer(opts *config.Options) error {
 		}
 	}
 
-	go func() {
-		ticker := time.NewTicker(time.Duration(opts.StoreInterval) * time.Second)
-		defer ticker.Stop()
+	if opts.StoreInterval > 0 {
+		go func() {
+			ticker := time.NewTicker(time.Duration(opts.StoreInterval) * time.Second)
+			defer ticker.Stop()
 
-		stop := make(chan os.Signal, 1)
-		signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+			stop := make(chan os.Signal, 1)
+			signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 
-		for {
-			select {
-			case <-ticker.C:
-				if err := db.SaveToDB(storage, opts.FileStoragePath); err != nil {
-					log.Error().Err(err).Msg("failed to save DB")
+			for {
+				select {
+				case <-ticker.C:
+					if err := db.SaveToDB(storage, opts.FileStoragePath); err != nil {
+						log.Error().Err(err).Msg("failed to save DB")
+					}
+				case <-stop:
+					log.Info().Msg("Shutting down server, saving metrics")
+					if err := db.SaveToDB(storage, opts.FileStoragePath); err != nil {
+						log.Error().Err(err).Msg("Failed to save metrics during shutdown")
+					}
+					os.Exit(0)
 				}
-			case <-stop:
-				log.Info().Msg("Shutting down server, saving metrics")
-				if err := db.SaveToDB(storage, opts.FileStoragePath); err != nil {
-					log.Error().Err(err).Msg("Failed to save metrics during shutdown")
-				}
-				os.Exit(0)
 			}
-		}
-	}()
+		}()
+	}
 
+	log.Info().Msg("Starting HTTP server...")
 	if err := http.ListenAndServe(opts.EndPointAddr, r); err != nil {
+		log.Error().Err(err).Msg("HTTP server failed to start")
 		fmt.Fprintf(os.Stderr, "HTTP-server didn't start: %v", err)
 		panic(err)
 	}
