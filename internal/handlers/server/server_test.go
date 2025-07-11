@@ -1,4 +1,4 @@
-package server
+package server_test
 
 import (
 	"io"
@@ -6,14 +6,26 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
 func TestUpdateMetric(t *testing.T) {
+	opts := &config.Options{}
+	for _, opt := range []func(*config.Options){
+		config.WithAddress("localhost:8080"),
+		config.WithStoreInterval(300),
+		config.WithFileStoragePath("/tmp/metrics-db.json"),
+		config.WithRestoreOnStart(true),
+	} {
+		opt(opts)
+	}
+
 	storage := ms.NewMemStorage()
-	router := NewRouter(storage)
+	router := router.NewRouter(storage, opts)
 
 	tests := []struct {
 		name       string
@@ -80,6 +92,16 @@ func TestUpdateMetric(t *testing.T) {
 }
 
 func TestGetMetric(t *testing.T) {
+	opts := &config.Options{}
+	for _, opt := range []func(*config.Options){
+		config.WithAddress("localhost:8080"),
+		config.WithStoreInterval(300),
+		config.WithFileStoragePath("/tmp/metrics-db.json"),
+		config.WithRestoreOnStart(true),
+	} {
+		opt(opts)
+	}
+
 	storage := ms.NewMemStorage()
 
 	if err := storage.UpdateMetric(mtr.GaugeType, "cpu_usage", 75.5); err != nil {
@@ -90,7 +112,7 @@ func TestGetMetric(t *testing.T) {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 
-	router := NewRouter(storage)
+	router := router.NewRouter(storage, opts)
 
 	tests := []struct {
 		name       string
