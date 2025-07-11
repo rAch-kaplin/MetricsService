@@ -53,13 +53,17 @@ var rootCmd = &cobra.Command{
 			}
 		}()
 
-		log.Info().Msgf("DSN: %q", opts.DataBaseDSN)
+		log.Info().Msgf("DSN: <%s>", opts.DataBaseDSN)
 		db, err := sql.Open("pgx", opts.DataBaseDSN)
 		if err != nil {
 			log.Error().Err(err).Msg("sql.Open error")
 			panic(err)
 		}
-		defer db.Close()
+		defer func() {
+			if err := db.Close(); err != nil {
+				log.Error().Err(err).Msg("Failed to db.Close")
+			}
+		}()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

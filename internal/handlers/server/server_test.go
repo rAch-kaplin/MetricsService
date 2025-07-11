@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,8 +25,20 @@ func TestUpdateMetric(t *testing.T) {
 		opt(opts)
 	}
 
+	//FIXME
+	db, err := sql.Open("pgx", opts.DataBaseDSN)
+	if err != nil {
+		log.Error().Err(err).Msg("sql.Open error")
+		panic(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to db.Close")
+		}
+	}()
+
 	storage := ms.NewMemStorage()
-	router := router.NewRouter(storage, opts)
+	router := router.NewRouter(storage, opts, db)
 
 	tests := []struct {
 		name       string
@@ -102,6 +115,18 @@ func TestGetMetric(t *testing.T) {
 		opt(opts)
 	}
 
+	//FIXME
+	db, err := sql.Open("pgx", opts.DataBaseDSN)
+	if err != nil {
+		log.Error().Err(err).Msg("sql.Open error")
+		panic(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to db.Close")
+		}
+	}()
+
 	storage := ms.NewMemStorage()
 
 	if err := storage.UpdateMetric(mtr.GaugeType, "cpu_usage", 75.5); err != nil {
@@ -112,7 +137,7 @@ func TestGetMetric(t *testing.T) {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 
-	router := router.NewRouter(storage, opts)
+	router := router.NewRouter(storage, opts, db)
 
 	tests := []struct {
 		name       string
