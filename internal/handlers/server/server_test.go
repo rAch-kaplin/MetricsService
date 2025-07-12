@@ -1,19 +1,46 @@
-package server
+package server_test
 
 import (
+	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
 func TestUpdateMetric(t *testing.T) {
+	opts := &config.Options{}
+	for _, opt := range []func(*config.Options){
+		config.WithAddress("localhost:8080"),
+		config.WithStoreInterval(300),
+		config.WithFileStoragePath("/tmp/metrics-db.json"),
+		config.WithRestoreOnStart(true),
+	} {
+		opt(opts)
+	}
+
+	//FIXME
+	db, err := sql.Open("pgx", opts.DataBaseDSN)
+	if err != nil {
+		log.Error().Err(err).Msg("sql.Open error")
+		panic(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to db.Close")
+		}
+	}()
+
 	storage := ms.NewMemStorage()
-	router := NewRouter(storage)
+	router := router.NewRouter(storage, opts, db)
 
 	tests := []struct {
 		name       string
@@ -80,6 +107,28 @@ func TestUpdateMetric(t *testing.T) {
 }
 
 func TestGetMetric(t *testing.T) {
+	opts := &config.Options{}
+	for _, opt := range []func(*config.Options){
+		config.WithAddress("localhost:8080"),
+		config.WithStoreInterval(300),
+		config.WithFileStoragePath("/tmp/metrics-db.json"),
+		config.WithRestoreOnStart(true),
+	} {
+		opt(opts)
+	}
+
+	//FIXME
+	db, err := sql.Open("pgx", opts.DataBaseDSN)
+	if err != nil {
+		log.Error().Err(err).Msg("sql.Open error")
+		panic(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to db.Close")
+		}
+	}()
+
 	storage := ms.NewMemStorage()
 
 	if err := storage.UpdateMetric(mtr.GaugeType, "cpu_usage", 75.5); err != nil {
@@ -90,7 +139,7 @@ func TestGetMetric(t *testing.T) {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 
-	router := NewRouter(storage)
+	router := router.NewRouter(storage, opts, db)
 
 	tests := []struct {
 		name       string
