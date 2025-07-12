@@ -53,6 +53,7 @@ var rootCmd = &cobra.Command{
 			}
 		}()
 
+		//opts.DataBaseDSN = "postgres://postgres:postgres@localhost:5432/mipt?sslmode=disable"
 		log.Info().Msgf("DSN: <%s>", opts.DataBaseDSN)
 		db, err := sql.Open("pgx", opts.DataBaseDSN)
 		if err != nil {

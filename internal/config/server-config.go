@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/caarlos0/env/v6"
 	"github.com/spf13/cobra"
@@ -82,7 +83,7 @@ func WithDataBaseDSN(dataBaseDSN string) func(*Options) {
 }
 
 func ParseOptionsFromCmd(cmd *cobra.Command, endPointAddr string, storeInterval int, fileStoragePath string,
-							restoreOnStart bool, dataBaseDSN string) (*Options, error) {
+						restoreOnStart bool, dataBaseDSN string) (*Options, error) {
 	var envCfg EnvConfig
 	if err := env.Parse(&envCfg); err != nil {
 		return nil, fmt.Errorf("failed to parse environment: %w", err)
@@ -90,7 +91,8 @@ func ParseOptionsFromCmd(cmd *cobra.Command, endPointAddr string, storeInterval 
 
 	var envOpts []func(*Options)
 	if envCfg.DataBaseDSN != "" {
-		envOpts = append(envOpts, WithDataBaseDSN(envCfg.DataBaseDSN))
+		cleanDSN := strings.Trim(envCfg.DataBaseDSN, "'")
+		envOpts = append(envOpts, WithDataBaseDSN(cleanDSN))
 	}
 	if envCfg.EndPointAddr != "" {
 		envOpts = append(envOpts, WithAddress(envCfg.EndPointAddr))
