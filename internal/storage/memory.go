@@ -1,16 +1,11 @@
-package memstorage
+package storage
 
 import (
+	"context"
 	"sync"
 
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 )
-
-type Collector interface {
-	GetMetric(mType, mName string) (any, bool)
-	GetAllMetrics() []mtr.Metric
-	UpdateMetric(mType, mName string, mValue any) error
-}
 
 type MemStorage struct {
 	mutex   sync.RWMutex
@@ -23,7 +18,7 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-func (ms *MemStorage) UpdateMetric(mType, mName string, mValue any) error {
+func (ms *MemStorage) UpdateMetric(_ context.Context, mType, mName string, mValue any) error {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
 
@@ -59,7 +54,7 @@ func (ms *MemStorage) UpdateMetric(mType, mName string, mValue any) error {
 	return nil
 }
 
-func (ms *MemStorage) GetMetric(mType, mName string) (any, bool) {
+func (ms *MemStorage) GetMetric(_ context.Context, mType, mName string) (any, bool) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
@@ -70,7 +65,7 @@ func (ms *MemStorage) GetMetric(mType, mName string) (any, bool) {
 	return nil, false
 }
 
-func (ms *MemStorage) GetAllMetrics() []mtr.Metric {
+func (ms *MemStorage) GetAllMetrics(_ context.Context) []mtr.Metric {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
