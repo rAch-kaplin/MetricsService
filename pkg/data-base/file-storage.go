@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
-
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
@@ -16,10 +14,10 @@ import (
 func SaveToDB(collector ms.Collector, path string) error {
 	allMetrics := collector.GetAllMetrics()
 
-	data := make([]server.Metrics, 0, len(allMetrics))
+	data := make([]mtr.Metrics, 0, len(allMetrics))
 
 	for _, metric := range allMetrics {
-		var newMetric server.Metrics
+		var newMetric mtr.Metrics
 
 		newMetric.MType = metric.Type()
 		newMetric.ID = metric.Name()
@@ -58,7 +56,7 @@ func LoadFromDB(collector ms.Collector, path string) error {
 		return fmt.Errorf("can't read file %s with DB %w", path, err)
 	}
 
-	var data []server.Metrics
+	var data []mtr.Metrics
 	err = json.Unmarshal(bytes, &data)
 	if err != nil {
 		return fmt.Errorf("can't parse json format from DB %w", err)

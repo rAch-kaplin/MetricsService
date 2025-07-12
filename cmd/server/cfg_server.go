@@ -31,61 +31,12 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "server",
-	Short: "MetricService",
-	Long:  "MetricService",
-	Args:  cobra.NoArgs,
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		var err error
-		opts, err = config.ParseOptionsFromCmd(cmd, endPointAddr, storeInterval, fileStoragePath, restoreOnStart, dataBaseDSN)
-		return err
-	},
-
-	RunE: func(cmd *cobra.Command, args []string) error {
-		logFile, err := log.InitLogger("logFileServer.log")
-		if err != nil {
-			return fmt.Errorf("logger init error: %w", err)
-		}
-
-		defer func() {
-			if err := logFile.Close(); err != nil {
-				log.Error().Err(err).Msg("Failed to close log file")
-			}
-		}()
-
-		log.Info().Msgf("DSN: %s", opts.DataBaseDSN)
-		db, err := sql.Open("pgx", opts.DataBaseDSN)
-		if err != nil {
-			log.Error().Err(err).Msg("sql.Open error")
-			panic(err)
-		}
-		defer func() {
-			if err := db.Close(); err != nil {
-				log.Error().Err(err).Msg("Failed to db.Close")
-			}
-		}()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		stop := make(chan os.Signal, 1)
-		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-
-		serverErrCh := make(chan error, 1)
-		go func() {
-			serverErrCh <- startServer(ctx, opts, db)
-		}()
-
-		select {
-		case sig := <-stop:
-			log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
-			cancel()
-			err := <-serverErrCh
-			return err
-		case err := <-serverErrCh:
-			return err
-		}
-	},
+	Use:     "server",
+	Short:   "MetricService",
+	Long:    "MetricService",
+	Args:    cobra.NoArgs,
+	PreRunE: PreRunE,
+	RunE:    RunE,
 }
 
 func init() {
@@ -94,6 +45,58 @@ func init() {
 	rootCmd.Flags().StringVarP(&fileStoragePath, "f", "f", config.DefaultFileStoragePath, "file to store metrics")
 	rootCmd.Flags().BoolVarP(&restoreOnStart, "r", "r", config.DefaultRestoreOnStart, "restore metrics from file on start")
 	rootCmd.Flags().StringVarP(&dataBaseDSN, "d", "d", config.DefaultDataBaseDSN, "database dsn")
+}
+
+func PreRunE(cmd *cobra.Command, args []string) error {
+	var err error
+	opts, err = config.ParseOptionsFromCmd(cmd, endPointAddr, storeInterval, fileStoragePath, restoreOnStart, dataBaseDSN)
+	return err
+}
+
+func RunE(cmd *cobra.Command, args []string) error {
+	logFile, err := log.InitLogger("logFileServer.log")
+	if err != nil {
+		return fmt.Errorf("logger init error: %w", err)
+	}
+
+	defer func() {
+		if err := logFile.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close log file")
+		}
+	}()
+
+	log.Info().Msgf("DSN: %s", opts.DataBaseDSN)
+	db, err := sql.Open("pgx", opts.DataBaseDSN)
+	if err != nil {
+		log.Error().Err(err).Msg("sql.Open error")
+		panic(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to db.Close")
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	serverErrCh := make(chan error, 1)
+	go func() {
+		serverErrCh <- startServer(ctx, opts, db)
+	}()
+
+	select {
+	case sig := <-stop:
+		log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
+		cancel()
+		err := <-serverErrCh
+		return err
+	case err := <-serverErrCh:
+		return err
+	}
 }
 
 func startServer(ctx context.Context, opts *config.Options, db *sql.DB) error {
