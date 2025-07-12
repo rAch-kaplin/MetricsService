@@ -53,8 +53,7 @@ var rootCmd = &cobra.Command{
 			}
 		}()
 
-		//opts.DataBaseDSN = "postgres://postgres:postgres@localhost:5432/mipt?sslmode=disable"
-		log.Info().Msgf("DSN: <%s>", opts.DataBaseDSN)
+		log.Info().Msgf("DSN: %s", opts.DataBaseDSN)
 		db, err := sql.Open("pgx", opts.DataBaseDSN)
 		if err != nil {
 			log.Error().Err(err).Msg("sql.Open error")
@@ -146,7 +145,7 @@ func startServer(ctx context.Context, opts *config.Options, db *sql.DB) error {
 	}()
 
 	<-ctx.Done()
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
