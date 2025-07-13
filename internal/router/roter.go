@@ -21,9 +21,6 @@ func NewRouter(storage col.Collector, opts *config.Options, db *sql.DB) http.Han
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", server.GetAllMetrics(storage))
 		r.Route("/update", func(r chi.Router) {
-			// if opts.StoreInterval == 0 {
-			// 	r.Use(database.WithSaveToDB(storage, opts.FileStoragePath))
-			// }
 
 			r.Post("/", server.UpdateMetricsHandlerJSON(storage))
 			r.Post("/{mType}/{mName}/{mValue}", server.UpdateMetric(storage))

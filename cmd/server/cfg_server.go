@@ -64,17 +64,17 @@ func RunE(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	log.Info().Msgf("DSN: %s", opts.DataBaseDSN)
-	db, err := sql.Open("pgx", opts.DataBaseDSN)
-	if err != nil {
-		log.Error().Err(err).Msg("sql.Open error")
-		panic(err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Error().Err(err).Msg("Failed to db.Close")
-		}
-	}()
+	// log.Info().Msgf("DSN: %s", opts.DataBaseDSN)
+	// db, err := sql.Open("pgx", opts.DataBaseDSN)
+	// if err != nil {
+	// 	log.Error().Err(err).Msg("sql.Open error")
+	// 	panic(err)
+	// }
+	// defer func() {
+	// 	if err := db.Close(); err != nil {
+	// 		log.Error().Err(err).Msg("Failed to db.Close")
+	// 	}
+	// }()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -84,7 +84,7 @@ func RunE(cmd *cobra.Command, args []string) error {
 
 	serverErrCh := make(chan error, 1)
 	go func() {
-		serverErrCh <- startServer(ctx, opts, db)
+		serverErrCh <- startServer(ctx, opts)
 	}()
 
 	select {
@@ -98,45 +98,16 @@ func RunE(cmd *cobra.Command, args []string) error {
 	}
 }
 
-func startServer(ctx context.Context, opts *config.Options, db *sql.DB) error {
+func startServer(ctx context.Context, opts *config.Options) error {
 	log.Info().
 		Str("address", opts.EndPointAddr).
 		Msg("Server configuration")
 
-	//storage := ms.NewMemStorage()
 	collector, err := ChoiceCollector(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("failed to create collector: %w", err)
 	}
-	r := router.NewRouter(collector, opts, db)
-
-	// 	if opts.RestoreOnStart {
-	// 		if err := database.LoadFromDB(storage, opts.FileStoragePath); err != nil && !errors.Is(err, os.ErrNotExist) {
-	// 			return fmt.Errorf("LoadFromDB error %w", err)
-	// 		}
-	// 	}
-	//
-	// 	if opts.StoreInterval > 0 {
-	// 		go func() {
-	// 			ticker := time.NewTicker(time.Duration(opts.StoreInterval) * time.Second)
-	// 			defer ticker.Stop()
-	//
-	// 			for {
-	// 				select {
-	// 				case <-ticker.C:
-	// 					if err := database.SaveToDB(storage, opts.FileStoragePath); err != nil {
-	// 						log.Error().Err(err).Msg("failed to save DB")
-	// 					}
-	// 				case <-ctx.Done():
-	// 					log.Info().Msg("Shutting down server, saving metrics")
-	// 					if err := database.SaveToDB(storage, opts.FileStoragePath); err != nil {
-	// 						log.Error().Err(err).Msg("Failed to save metrics during shutdown")
-	// 					}
-	// 					return
-	// 				}
-	// 			}
-	// 		}()
-	// 	}
+	r := router.NewRouter(collector, opts, collector.db)
 
 	srv := &http.Server{
 		Addr:    opts.EndPointAddr,
