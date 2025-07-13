@@ -1,19 +1,19 @@
 package database
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
+	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
-func SaveToDB(collector ms.Collector, path string) error {
-	allMetrics := collector.GetAllMetrics()
+func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
+	allMetrics := collector.GetAllMetrics(ctx)
 
 	data := make([]mtr.Metrics, 0, len(allMetrics))
 
@@ -88,7 +88,7 @@ func SaveToDB(collector ms.Collector, path string) error {
 	return nil
 }
 
-func LoadFromDB(collector ms.Collector, path string) error {
+func LoadFromDB(ctx context.Context, collector col.Collector, path string) error {
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("can't read file %s with DB %w", path, err)
@@ -108,12 +108,12 @@ func LoadFromDB(collector ms.Collector, path string) error {
 	for _, metric := range data {
 		switch metric.MType {
 		case mtr.GaugeType:
-			if err := collector.UpdateMetric(metric.MType, metric.ID, *metric.Value); err != nil {
+			if err := collector.UpdateMetric(ctx, metric.MType, metric.ID, *metric.Value); err != nil {
 				log.Error().Err(err).Msg("update metric error")
 				return fmt.Errorf("update metric error %w", err)
 			}
 		case mtr.CounterType:
-			if err := collector.UpdateMetric(metric.MType, metric.ID, *metric.Delta); err != nil {
+			if err := collector.UpdateMetric(ctx, metric.MType, metric.ID, *metric.Delta); err != nil {
 				log.Error().Err(err).Msg("update metric error")
 				return fmt.Errorf("update metric error %w", err)
 			}
@@ -123,14 +123,4 @@ func LoadFromDB(collector ms.Collector, path string) error {
 	return nil
 }
 
-func WithSaveToDB(collector ms.Collector, filePath string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			next.ServeHTTP(w, req)
 
-			if err := SaveToDB(collector, filePath); err != nil {
-				log.Error().Err(err).Msg("Failed to save metrics synchronously")
-			}
-		})
-	}
-}

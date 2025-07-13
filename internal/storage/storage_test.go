@@ -1,6 +1,7 @@
-package memstorage
+package storage
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -8,6 +9,8 @@ import (
 )
 
 func TestMemStorage_UpdateMetric(t *testing.T) {
+	ctx := context.Background()
+
 	type fields struct {
 		storage map[string]map[string]mtr.Metric
 	}
@@ -98,12 +101,12 @@ func TestMemStorage_UpdateMetric(t *testing.T) {
 				mutex:   sync.RWMutex{},
 				storage: tt.fields.storage,
 			}
-			if err := ms.UpdateMetric(tt.args.mType, tt.args.mName, tt.args.mValue); (err != nil) != tt.wantErr {
+			if err := ms.UpdateMetric(ctx, tt.args.mType, tt.args.mName, tt.args.mValue); (err != nil) != tt.wantErr {
 				t.Errorf("MemStorage.UpdateMetric() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			if !tt.wantErr {
-				val, ok := ms.GetMetric(tt.args.mType, tt.args.mName)
+				val, ok := ms.GetMetric(ctx, tt.args.mType, tt.args.mName)
 				if !ok {
 					t.Errorf("metric not found")
 					return
@@ -117,6 +120,8 @@ func TestMemStorage_UpdateMetric(t *testing.T) {
 }
 
 func TestMemStorage_GetMetric(t *testing.T) {
+	ctx := context.Background()
+	
 	counter := mtr.NewCounter("requests", 42)
 	gauge := mtr.NewGauge("temperature", 36.6)
 
@@ -174,7 +179,7 @@ func TestMemStorage_GetMetric(t *testing.T) {
 				mutex:   sync.RWMutex{},
 				storage: tt.fields,
 			}
-			gotVal, gotOk := ms.GetMetric(tt.mType, tt.mName)
+			gotVal, gotOk := ms.GetMetric(ctx, tt.mType, tt.mName)
 			if gotVal != tt.wantVal {
 				t.Errorf("GetMetric() gotVal = %v, want %v", gotVal, tt.wantVal)
 			}
@@ -258,4 +263,3 @@ func TestMemStorage_GetMetric(t *testing.T) {
 // 		})
 // 	}
 // }
-

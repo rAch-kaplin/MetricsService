@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,10 +12,10 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/spf13/cobra"
 
+	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
-	database "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/data-base"
+	storage "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -79,18 +77,6 @@ func RunE(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	log.Info().Msgf("DSN: %s", opts.DataBaseDSN)
-	db, err := sql.Open("pgx", opts.DataBaseDSN)
-	if err != nil {
-		log.Error().Err(err).Msg("sql.Open error")
-		panic(err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Error().Err(err).Msg("Failed to db.Close")
-		}
-	}()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -99,7 +85,7 @@ func RunE(cmd *cobra.Command, args []string) error {
 
 	serverErrCh := make(chan error, 1)
 	go func() {
-		serverErrCh <- startServer(ctx, opts, db)
+		serverErrCh <- startServer(ctx, opts)
 	}()
 
 	select {
@@ -113,42 +99,22 @@ func RunE(cmd *cobra.Command, args []string) error {
 	}
 }
 
-func startServer(ctx context.Context, opts *config.Options, db *sql.DB) error {
+func startServer(ctx context.Context, opts *config.Options) error {
 	log.Info().
 		Str("address", opts.EndPointAddr).
 		Msg("Server configuration")
 
-	storage := ms.NewMemStorage()
-	r := router.NewRouter(storage, opts, db)
-
-	if opts.RestoreOnStart {
-		log.Debug().Msg("restoreOnStart")
-		if err := database.LoadFromDB(storage, opts.FileStoragePath); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("LoadFromDB error %w", err)
+	collector, err := ChoiceCollector(ctx, opts)
+	if err != nil {
+		return fmt.Errorf("failed to create collector: %w", err)
+	}
+	defer func() {
+		if err := collector.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close collector")
 		}
-	}
+	}()
 
-	if opts.StoreInterval > 0 {
-		go func() {
-			ticker := time.NewTicker(time.Duration(opts.StoreInterval) * time.Second)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ticker.C:
-					if err := database.SaveToDB(storage, opts.FileStoragePath); err != nil {
-						log.Error().Err(err).Msg("failed to save DB")
-					}
-				case <-ctx.Done():
-					log.Info().Msg("Shutting down server, saving metrics")
-					if err := database.SaveToDB(storage, opts.FileStoragePath); err != nil {
-						log.Error().Err(err).Msg("Failed to save metrics during shutdown")
-					}
-					return
-				}
-			}
-		}()
-	}
+	r := router.NewRouter(collector, opts)
 
 	srv := &http.Server{
 		Addr:    opts.EndPointAddr,
@@ -174,4 +140,30 @@ func startServer(ctx context.Context, opts *config.Options, db *sql.DB) error {
 	log.Info().Msg("Server gracefully stopped")
 
 	return nil
+}
+
+func ChoiceCollector(ctx context.Context, opts *config.Options) (col.Collector, error) {
+	var (
+		collector col.Collector
+		err       error
+	)
+
+	switch {
+	case opts.DataBaseDSN != "":
+		collector, err = storage.NewDatabase(ctx, opts.DataBaseDSN)
+	case opts.FileStoragePath != "":
+		collector, err = storage.NewFileStorage(ctx, &storage.FileParams{
+			FileStoragePath: opts.FileStoragePath,
+			RestoreOnStart:  opts.RestoreOnStart,
+			StoreInterval:   opts.StoreInterval})
+	default:
+		collector = storage.NewMemStorage()
+	}
+
+	if err != nil {
+		log.Error().Err(err).Msg("failed create storage")
+		return nil, err
+	}
+
+	return collector, nil
 }
