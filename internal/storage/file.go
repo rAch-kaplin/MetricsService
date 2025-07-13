@@ -106,3 +106,11 @@ func (fs *FileStorage) GetAllMetrics(ctx context.Context) []mtr.Metric {
 
 	return fs.storage.GetAllMetrics(ctx)
 }
+
+func (fs *FileStorage) Ping(ctx context.Context) error {
+    return nil
+}
+
+func (fs *FileStorage) Close() error {
+	return nil
+}

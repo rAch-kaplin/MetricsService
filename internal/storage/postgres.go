@@ -8,6 +8,7 @@ import (
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	"github.com/rs/zerolog/log"
 )
 
@@ -23,11 +24,6 @@ func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error)
 		log.Error().Err(err).Msg("sql.Open error")
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
-	// defer func() { //FIXME - make Close() method for collector interface maybe
-	// 	if err := db.Close(); err != nil {
-	// 		log.Error().Err(err).Msg("Failed to db.Close")
-	// 	}
-	// }()
 
 	_, err = db.ExecContext(ctx,
 		"CREATE TABLE IF NOT EXISTS collector ("+
@@ -38,7 +34,10 @@ func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error)
 			");")
 
 	if err != nil {
-		db.Close()
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("failed to close database")
+		}
+
 		log.Error().Err(err).Msg("failed create table for database")
 		return nil, fmt.Errorf("failed create table for database %w", err)
 	}
@@ -146,9 +145,12 @@ func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
 		return nil
 	}
 
-	//TODO convert to type mtr.Metric
+	convertedMetrics, err := converter.ConvertMetrics(metrics)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert metrics")
+		return nil
+	}
 
-	var convertedMetrics []mtr.Metric
 	return convertedMetrics
 }
 
@@ -188,11 +190,29 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 		 SET "Delta" = EXCLUDED."Delta",
 		     "Value" = EXCLUDED."Value",
 		     "MType" = EXCLUDED."MType";`,
-		m.ID, m.MType, m.Delta, m.Value,)
+		m.ID, m.MType, m.Delta, m.Value)
 
 	if err != nil {
 		log.Error().Err(err).Msg("failed update insert into collector")
 		return fmt.Errorf("failed update insert into collector: %w", err)
+	}
+
+	return nil
+}
+
+func (db *Database) Ping(ctx context.Context) error {
+	return db.DB.PingContext(ctx)
+}
+
+func (db *Database) Close() error {
+	db.mutex.Lock()
+	defer db.mutex.Unlock()
+
+	if db.DB != nil {
+		if err := db.DB.Close(); err != nil {
+			log.Error().Err(err).Msg("failed to close database")
+			return err
+		}
 	}
 
 	return nil

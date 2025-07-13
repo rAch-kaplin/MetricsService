@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
@@ -64,18 +63,6 @@ func RunE(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	// log.Info().Msgf("DSN: %s", opts.DataBaseDSN)
-	// db, err := sql.Open("pgx", opts.DataBaseDSN)
-	// if err != nil {
-	// 	log.Error().Err(err).Msg("sql.Open error")
-	// 	panic(err)
-	// }
-	// defer func() {
-	// 	if err := db.Close(); err != nil {
-	// 		log.Error().Err(err).Msg("Failed to db.Close")
-	// 	}
-	// }()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -107,7 +94,13 @@ func startServer(ctx context.Context, opts *config.Options) error {
 	if err != nil {
 		return fmt.Errorf("failed to create collector: %w", err)
 	}
-	r := router.NewRouter(collector, opts, collector.db)
+	defer func() {
+		if err := collector.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close collector")
+		}
+	}()
+
+	r := router.NewRouter(collector, opts)
 
 	srv := &http.Server{
 		Addr:    opts.EndPointAddr,
@@ -142,8 +135,8 @@ func ChoiceCollector(ctx context.Context, opts *config.Options) (col.Collector, 
 	)
 
 	switch {
-	// case opts.DataBaseDSN != "":
-	// 	collector, err = storage.NewPostgreSQL(ctx, opts.DataBaseDSN)
+	case opts.DataBaseDSN != "":
+		collector, err = storage.NewDatabase(ctx, opts.DataBaseDSN)
 	case opts.FileStoragePath != "":
 		collector, err = storage.NewFileStorage(ctx, &storage.FileParams{
 			FileStoragePath: opts.FileStoragePath,

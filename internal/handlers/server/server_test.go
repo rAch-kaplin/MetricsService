@@ -41,7 +41,7 @@ func TestUpdateMetric(t *testing.T) {
 	}()
 
 	storage := storage.NewMemStorage()
-	router := router.NewRouter(storage, opts, db)
+	router := router.NewRouter(storage, opts)
 
 	tests := []struct {
 		name       string
@@ -142,7 +142,7 @@ func TestGetMetric(t *testing.T) {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 
-	router := router.NewRouter(storage, opts, db)
+	router := router.NewRouter(storage, opts)
 
 	tests := []struct {
 		name       string

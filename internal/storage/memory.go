@@ -83,3 +83,11 @@ func (ms *MemStorage) GetAllMetrics(_ context.Context) []mtr.Metric {
 
 	return result
 }
+
+func (mc *MemStorage) Ping(ctx context.Context) error {
+    return nil
+}
+
+func (ms *MemStorage) Close() error {
+	return nil
+}

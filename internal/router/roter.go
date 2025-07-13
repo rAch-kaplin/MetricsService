@@ -1,7 +1,6 @@
 package router
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -12,7 +11,7 @@ import (
 	//database "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/data-base"
 )
 
-func NewRouter(storage col.Collector, opts *config.Options, db *sql.DB) http.Handler {
+func NewRouter(storage col.Collector, opts *config.Options) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(server.WithLogging)
@@ -32,7 +31,7 @@ func NewRouter(storage col.Collector, opts *config.Options, db *sql.DB) http.Han
 		})
 
 		r.Route("/ping", func(r chi.Router) {
-			r.Get("/", server.WithDataBase(db, server.PingDataBase))
+			r.Get("/", server.PingHandler(storage))
 		})
 	})
 
