@@ -123,4 +123,3 @@ func LoadFromDB(ctx context.Context, collector col.Collector, path string) error
 	return nil
 }
 
-

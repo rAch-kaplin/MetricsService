@@ -72,6 +72,12 @@ func (fs *FileStorage) UpdateMetric(ctx context.Context, mType, mName string, mV
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
+	log.Debug().
+		Str("type", mType).
+		Str("name", mName).
+		Interface("value", mValue).
+		Msg("Updating metric")
+
 	if err := fs.storage.UpdateMetric(ctx, mType, mName, mValue); err != nil {
 		log.Error().Err(err).Msg("failed update metric from file storage")
 		return fmt.Errorf("failed update metric from file storage %w", err)
@@ -83,6 +89,11 @@ func (fs *FileStorage) UpdateMetric(ctx context.Context, mType, mName string, mV
 			return fmt.Errorf("failed save storage %w", err)
 		}
 	}
+
+	log.Info().
+		Str("type", mType).
+		Str("name", mName).
+		Msg("Metric updated successfully")
 
 	return nil
 }
@@ -108,7 +119,7 @@ func (fs *FileStorage) GetAllMetrics(ctx context.Context) []mtr.Metric {
 }
 
 func (fs *FileStorage) Ping(ctx context.Context) error {
-    return nil
+	return nil
 }
 
 func (fs *FileStorage) Close() error {
