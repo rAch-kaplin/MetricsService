@@ -56,7 +56,6 @@ func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) 
 					}
 				case <-ctx.Done():
 					log.Info().Msg("Shutting down server, saving metrics")
-
 					if err := database.SaveToDB(ctx, fs.storage, fp.FileStoragePath); err != nil {
 						log.Error().Err(err).Msg("Failed to save metrics during shutdown")
 					}
