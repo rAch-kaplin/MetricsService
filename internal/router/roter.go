@@ -8,7 +8,6 @@ import (
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
-	//database "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/data-base"
 )
 
 func NewRouter(storage col.Collector, opts *config.Options) http.Handler {

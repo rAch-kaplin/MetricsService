@@ -31,7 +31,7 @@ func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) 
 	fs := &FileStorage{
 		filePath:   fp.FileStoragePath,
 		storage:    NewMemStorage(),
-		SyncRecord: true,
+		SyncRecord: false,
 	}
 	if fp.RestoreOnStart {
 		if err := database.LoadFromDB(ctx, fs.storage, fp.FileStoragePath); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -40,7 +40,7 @@ func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) 
 	}
 
 	if fp.StoreInterval == 0 {
-		fs.SyncRecord = false
+		fs.SyncRecord = true
 	}
 
 	if fp.StoreInterval > 0 {
