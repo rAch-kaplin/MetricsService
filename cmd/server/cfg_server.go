@@ -156,6 +156,8 @@ func ChoiceCollector(ctx context.Context, opts *config.Options) (col.Collector, 
 			FileStoragePath: opts.FileStoragePath,
 			RestoreOnStart:  opts.RestoreOnStart,
 			StoreInterval:   opts.StoreInterval})
+
+		log.Debug().Msg("chose file storage")
 	default:
 		collector = storage.NewMemStorage()
 	}
