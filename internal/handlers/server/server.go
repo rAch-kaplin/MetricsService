@@ -229,7 +229,7 @@ func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 			return
 		}
 		log.Info().Msgf("Received metric request: %+v", metric)
-
+		fmt.Printf("GET METRIC: Получение метрики типа '%s' с именем '%s'\n", metric.MType, metric.ID)
 		if !FillMetricValueFromStorage(req.Context(), storage, &metric) {
 			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
 			return
@@ -282,6 +282,7 @@ func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 			value = *metric.Delta
 		}
 
+		fmt.Printf("UPDATE METRIC: Обновление метрики типа '%s', имя '%s', значение '%v'\n", metric.MType, metric.ID, value)
 		if err := storage.UpdateMetric(req.Context(), metric.MType, metric.ID, value); err != nil {
 			http.Error(resp, fmt.Sprintf("invalid update metric %s: %v", metric.ID, err), http.StatusBadRequest)
 		}
