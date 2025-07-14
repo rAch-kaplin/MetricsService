@@ -95,6 +95,7 @@ func LoadFromDB(ctx context.Context, collector col.Collector, path string) error
 		return fmt.Errorf("can't read file %s with DB %w", path, err)
 	}
 
+	log.Debug().Str("data", string(bytes)).Msg("metrics")
 	if len(bytes) == 0 {
 		log.Warn().Msgf("DB file %s is empty, skipping restore", path)
 		return nil
