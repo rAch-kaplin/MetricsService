@@ -83,6 +83,13 @@ func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
 		Msg("Metrics successfully saved")
 
 	return nil
+	// err = os.WriteFile(path, bytes, 0644)
+	//
+	//	if err != nil {
+	//		return fmt.Errorf("invalid write file %s: %w", path, err)
+	//	}
+	//
+	// return nil
 }
 
 func LoadFromDB(ctx context.Context, collector col.Collector, path string) error {
