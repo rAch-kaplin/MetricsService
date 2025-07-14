@@ -98,7 +98,6 @@ func LoadFromDB(ctx context.Context, collector col.Collector, path string) error
 		log.Warn().Msgf("DB file %s is empty, skipping restore", path)
 		return nil
 	}
-
 	var data []mtr.Metrics
 	err = json.Unmarshal(bytes, &data)
 	if err != nil {
@@ -122,4 +121,3 @@ func LoadFromDB(ctx context.Context, collector col.Collector, path string) error
 
 	return nil
 }
-
