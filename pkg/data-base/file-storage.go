@@ -14,12 +14,10 @@ import (
 
 func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
 	allMetrics := collector.GetAllMetrics(ctx)
-
 	data := make([]mtr.Metrics, 0, len(allMetrics))
 
 	for _, metric := range allMetrics {
 		var newMetric mtr.Metrics
-
 		newMetric.MType = metric.Type()
 		newMetric.ID = metric.Name()
 
@@ -27,19 +25,18 @@ func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
 		case mtr.GaugeType:
 			val, ok := metric.Value().(float64)
 			if !ok {
-				return fmt.Errorf("invalid type metric")
+				return fmt.Errorf("invalid gauge metric value")
 			}
 			newMetric.Value = &val
 		case mtr.CounterType:
 			val, ok := metric.Value().(int64)
 			if !ok {
-				return fmt.Errorf("invalid type metric")
+				return fmt.Errorf("invalid counter metric value")
 			}
 			newMetric.Delta = &val
 		default:
-			log.Error().Msg("unknown metric type")
+			return fmt.Errorf("unknown metric type")
 		}
-
 		data = append(data, newMetric)
 	}
 
@@ -86,13 +83,6 @@ func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
 		Msg("Metrics successfully saved")
 
 	return nil
-	// err = os.WriteFile(path, bytes, 0644)
-	//
-	//	if err != nil {
-	//		return fmt.Errorf("invalid write file %s: %w", path, err)
-	//	}
-	//
-	// return nil
 }
 
 func LoadFromDB(ctx context.Context, collector col.Collector, path string) error {
