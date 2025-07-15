@@ -53,8 +53,8 @@ func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, bo
 	defer db.mutex.RUnlock()
 
 	row := db.DB.QueryRowContext(ctx,
-		"SELECT ID, MType, Delta, Value FROM collector"+
-			"WHERE ID = $1 AND MType = $2 LIMIT 1", mName, mType)
+		`SELECT "ID", "MType", "Delta", "Value" FROM collector ` +
+    	`WHERE "ID" = $1 AND "MType" = $2 LIMIT 1`, mName, mType)
 
 	var (
 		id    string
