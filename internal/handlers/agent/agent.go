@@ -90,18 +90,22 @@ func sendMetric(client *resty.Client, metricJSON *mtr.Metrics) {
 		1 * time.Second,
 	}
 
-	// buf, err := ConvertToGzipData(metricJSON)
-	// if err != nil {
-	// 	log.Error().Err(err).Msg("Failed to convert metric to gzip")
-	// 	return
-	// }
+	buf, ok, err := ConvertToGzipData(metricJSON)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to convert metric to gzip")
+		return
+	}
 
 	for _, backoff := range backoffSchedule {
-		res, err := client.R().
+		req := client.R().
 			SetHeader("Content-Type", "application/json").
-			SetHeader("Content-Encoding", "gzip").
-			SetBody(metricJSON).
-			Post("update/")
+			SetBody(buf)
+
+		if ok {
+			req.SetHeader("Content-Encoding", "gzip")
+		}
+
+		res, err := req.Post("update/")
 
 		if err != nil || res.StatusCode() != http.StatusOK {
 		} else {
@@ -112,15 +116,24 @@ func sendMetric(client *resty.Client, metricJSON *mtr.Metrics) {
 	}
 }
 
-func ConvertToGzipData(metricJSON *mtr.Metrics) (*bytes.Buffer, error) {
+func ConvertToGzipData(metricJSON *mtr.Metrics) (*bytes.Buffer, bool, error) {
 	jsonData, err := easyjson.Marshal(*metricJSON)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to marshal metricJSON")
-		return nil, err
+		return nil, false, err
 	}
 
 	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
+	if len(jsonData) <= 1024 {
+		buf.Write(jsonData)
+		return &buf, false, nil
+	}
+
+	gz, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create gzip writer")
+		return nil, false, err
+	}
 	defer func() {
 		err := gz.Close()
 		if err != nil {
@@ -131,8 +144,8 @@ func ConvertToGzipData(metricJSON *mtr.Metrics) (*bytes.Buffer, error) {
 	_, err = gz.Write(jsonData)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to write gzip data")
-		return nil, err
+		return nil, false, err
 	}
 
-	return &buf, nil
+	return &buf, true, nil
 }
