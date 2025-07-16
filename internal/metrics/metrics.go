@@ -8,7 +8,13 @@ type Metric interface {
 	Value() any
 	Name() string
 	Type() string
-	Update(mName string, mValue any) error
+	Update(mValue any) error
+}
+
+type MetricTable struct {
+	Name  string
+	Type  string
+	Value string
 }
 
 const (

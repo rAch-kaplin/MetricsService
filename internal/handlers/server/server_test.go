@@ -1,19 +1,47 @@
-package server
+package server_test
 
 import (
+	"context"
+	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
+	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
 func TestUpdateMetric(t *testing.T) {
-	storage := ms.NewMemStorage()
-	router := NewRouter(storage)
+	opts := &config.Options{}
+	for _, opt := range []func(*config.Options){
+		config.WithAddress("localhost:8080"),
+		config.WithStoreInterval(300),
+		config.WithFileStoragePath("/tmp/metrics-db.json"),
+		config.WithRestoreOnStart(true),
+	} {
+		opt(opts)
+	}
+
+	//FIXME
+	db, err := sql.Open("pgx", opts.DataBaseDSN)
+	if err != nil {
+		log.Error().Err(err).Msg("sql.Open error")
+		panic(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to db.Close")
+		}
+	}()
+
+	storage := storage.NewMemStorage()
+	router := router.NewRouter(storage, opts)
 
 	tests := []struct {
 		name       string
@@ -80,17 +108,41 @@ func TestUpdateMetric(t *testing.T) {
 }
 
 func TestGetMetric(t *testing.T) {
-	storage := ms.NewMemStorage()
+	opts := &config.Options{}
+	for _, opt := range []func(*config.Options){
+		config.WithAddress("localhost:8080"),
+		config.WithStoreInterval(300),
+		config.WithFileStoragePath("/tmp/metrics-db.json"),
+		config.WithRestoreOnStart(true),
+	} {
+		opt(opts)
+	}
 
-	if err := storage.UpdateMetric(mtr.GaugeType, "cpu_usage", 75.5); err != nil {
+	//FIXME
+	db, err := sql.Open("pgx", opts.DataBaseDSN)
+	if err != nil {
+		log.Error().Err(err).Msg("sql.Open error")
+		panic(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to db.Close")
+		}
+	}()
+
+	//FIXME - maybe need mocks
+	ctx := context.Background()
+	storage := storage.NewMemStorage()
+
+	if err := storage.UpdateMetric(ctx, mtr.GaugeType, "cpu_usage", 75.5); err != nil {
 		log.Error().Msgf("Failed to update metric cpu_usage: %v", err)
 	}
 
-	if err := storage.UpdateMetric(mtr.CounterType, "requests_total", int64(100)); err != nil {
+	if err := storage.UpdateMetric(ctx, mtr.CounterType, "requests_total", int64(100)); err != nil {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 
-	router := NewRouter(storage)
+	router := router.NewRouter(storage, opts)
 
 	tests := []struct {
 		name       string
