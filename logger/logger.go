@@ -64,7 +64,7 @@ func Init(level LogLevel, logFileName string) error {
 func Destroy() {
 	log := getLogger()
 	if file, ok := log.out.(*os.File); ok {
-		file.Close()
+		_ = file.Close()
 	}
 }
 
@@ -81,7 +81,7 @@ func (log *logger) log(level LogLevel, format string, args ...interface{}) {
 	levelStr := levelMap[level]
 	msg := fmt.Sprintf(format, args...)
 
-	fmt.Fprintf(log.out, "[%s]%s[%s:%d]: %s \n", time, levelStr, filepath.Base(file), line, msg)
+	_, _ = fmt.Fprintf(log.out, "[%s]%s[%s:%d]: %s \n", time, levelStr, filepath.Base(file), line, msg)
 }
 
 func Debug(format string, args ...interface{}) {

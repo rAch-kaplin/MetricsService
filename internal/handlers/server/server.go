@@ -22,6 +22,8 @@ type MetricTable struct {
 func NewRouter(storage ms.Collector) http.Handler {
 	r := chi.NewRouter()
 
+	r.Use(WithLogging)
+
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", GetAllMetrics(storage))
 		r.Route("/", func(r chi.Router) {
@@ -54,12 +56,8 @@ func ConvertByType(mType, mValue string) (any, error) {
 
 func GetMetric(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		log.Debug().Msgf("Incoming GET request: %s %s", req.Method, req.URL.Path)
-
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
-		log.Debug().Msgf("Incoming request for metric: Type=%s, Name=%s", mType, mName)
-
 		value, found := storage.GetMetric(mType, mName)
 		if !found {
 			http.Error(res, fmt.Sprintf("Metric %s was not found", mName), http.StatusNotFound)
@@ -85,8 +83,6 @@ func GetMetric(storage ms.Collector) http.HandlerFunc {
 			log.Error().Msgf("Failed to write response: %v", err)
 
 		}
-
-		log.Debug().Msg("the metric has been send")
 	}
 }
 
@@ -171,27 +167,15 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 			log.Error().Msgf("failed complete template: %v", err)
 		}
 
-		log.Debug().Msg("the metrics has been send")
 		res.WriteHeader(http.StatusOK)
 	}
 }
 
 func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		log.Debug().
-			Str("method", req.Method).
-			Str("url", req.URL.Path).
-			Msg("Incoming POST request")
-
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
 		mValue := chi.URLParam(req, "mValue")
-    
-		log.Debug().
-			Str("metric_type", mType).
-			Str("metric_name", mName).
-			Str("metric_value", mValue).
-			Msg("Parsed metric")
 
 		if mName == "" {
 			log.Error().
