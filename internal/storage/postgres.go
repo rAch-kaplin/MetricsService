@@ -8,6 +8,7 @@ import (
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	"github.com/rs/zerolog/log"
 )
@@ -131,7 +132,7 @@ func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
 	db.mutex.RLock()
 	defer db.mutex.RUnlock()
 
-	metrics := make([]mtr.Metrics, 0)
+	metrics := make(serialize.MetricsList, 0)
 
 	rows, err := db.DB.QueryContext(ctx,
 		"SELECT ID, MType, Delta, Value FROM collector")
@@ -152,7 +153,7 @@ func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
 	)
 
 	for rows.Next() {
-		var metric mtr.Metrics
+		var metric serialize.Metric
 
 		err = rows.Scan(&metric.ID, &metric.MType, &delta, &value)
 		if err != nil {
@@ -226,7 +227,7 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 
 		m.Update(mValue)
 	}
-	metric := mtr.Metrics{
+	metric := serialize.Metric{
 		ID:    mName,
 		MType: mType,
 	}

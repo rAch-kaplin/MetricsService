@@ -16,6 +16,7 @@ import (
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
+	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
 func ConvertByType(mType, mValue string) (any, error) {
@@ -192,7 +193,7 @@ func UpdateMetric(storage col.Collector) http.HandlerFunc {
 	}
 }
 
-func FillMetricValueFromStorage(ctx context.Context, storage col.Collector, metric *mtr.Metrics) bool {
+func FillMetricValueFromStorage(ctx context.Context, storage col.Collector, metric *serialize.Metric) bool {
 	value, ok := storage.GetMetric(ctx, metric.MType, metric.ID)
 	if !ok {
 		return false
@@ -217,7 +218,7 @@ func FillMetricValueFromStorage(ctx context.Context, storage col.Collector, metr
 
 func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
-		var metric mtr.Metrics
+		var metric serialize.Metric
 
 		log.Info().Msg("GetMetricsHandlerJSON called")
 		if req.Header.Get("Content-Type") != "application/json" {
@@ -303,7 +304,7 @@ func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 
 func UpdatesMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		var jsonMetrics mtr.MetricsList
+		var jsonMetrics serialize.MetricsList
 
 		log.Info().Msg("UpdatesMetricsHandlerJSON called")
 		if req.Header.Get("Content-Type") != "application/json" {

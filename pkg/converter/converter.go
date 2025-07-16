@@ -4,9 +4,10 @@ import (
 	"fmt"
 
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
-func ConvertMetrics(src []mtr.Metrics) ([]mtr.Metric, error) {
+func ConvertMetrics(src serialize.MetricsList) ([]mtr.Metric, error) {
 	converted := make([]mtr.Metric, 0, len(src))
 
 	for _, m := range src {
@@ -30,7 +31,7 @@ func ConvertMetrics(src []mtr.Metrics) ([]mtr.Metric, error) {
 	return converted, nil
 }
 
-func ConvertMetric(src mtr.Metrics) (mtr.Metric, error) {
+func ConvertMetric(src serialize.Metric) (mtr.Metric, error) {
 	var converted mtr.Metric
 
 	switch src.MType {

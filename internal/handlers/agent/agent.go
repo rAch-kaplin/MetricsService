@@ -17,6 +17,7 @@ import (
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
+	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
 func UpdateAllMetrics(ctx context.Context, storage *storage.MemStorage) {
@@ -53,7 +54,7 @@ func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.
 		mType := metric.Type()
 		mName := metric.Name()
 
-		metricJSON := mtr.Metrics{
+		metricJSON := serialize.Metric{
 			ID:    mName,
 			MType: mType,
 		}
@@ -84,7 +85,7 @@ func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.
 	}
 }
 
-func sendMetric(client *resty.Client, metricJSON *mtr.Metrics) {
+func sendMetric(client *resty.Client, metricJSON *serialize.Metric) {
 	backoffSchedule := []time.Duration{
 		100 * time.Millisecond,
 		500 * time.Millisecond,
