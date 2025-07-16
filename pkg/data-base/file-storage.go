@@ -55,8 +55,7 @@ func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	tmpPath := path + ".tmp"
-	file, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -72,10 +71,6 @@ func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
 
 	if err := file.Sync(); err != nil {
 		return fmt.Errorf("sync failed: %w", err)
-	}
-
-	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("rename failed: %w", err)
 	}
 
 	log.Info().
@@ -98,7 +93,7 @@ func LoadFromDB(ctx context.Context, collector col.Collector, path string) error
 
 	if len(bytes) == 0 {
 		log.Warn().Msgf("DB file %s is empty, skipping restore", path)
-		return nil
+		return os.ErrNotExist
 	}
 
 	var data serialize.MetricsList

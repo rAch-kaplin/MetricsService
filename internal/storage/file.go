@@ -27,14 +27,27 @@ type FileParams struct {
 	StoreInterval   int
 }
 
+func (fs *FileStorage) save(ctx context.Context) {
+	fs.mutex.Lock()
+	defer fs.mutex.Unlock()
+
+	if err := database.SaveToDB(ctx, fs.storage, fs.filePath); err != nil {
+		log.Error().Err(err).Msg("failed to save DB")
+	}
+}
+
 func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) {
 	fs := &FileStorage{
 		filePath:   fp.FileStoragePath,
 		storage:    NewMemStorage(),
-		SyncRecord: false,
+		SyncRecord: fp.StoreInterval == 0,
 	}
 	if fp.RestoreOnStart {
-		if err := database.LoadFromDB(ctx, fs.storage, fp.FileStoragePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		fs.mutex.Lock()
+		err := database.LoadFromDB(ctx, fs.storage, fp.FileStoragePath)
+		fs.mutex.Unlock()
+
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("LoadFromDB error %w", err)
 		}
 	}
@@ -51,15 +64,10 @@ func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) 
 			for {
 				select {
 				case <-ticker.C:
-					if err := database.SaveToDB(ctx, fs.storage, fp.FileStoragePath); err != nil {
-						log.Error().Err(err).Msg("failed to save DB")
-					}
+					fs.save(ctx)
 				case <-ctx.Done():
 					log.Info().Msg("Shutting down server, saving metrics")
-
-					if err := database.SaveToDB(ctx, fs.storage, fp.FileStoragePath); err != nil {
-						log.Error().Err(err).Msg("Failed to save metrics during shutdown")
-					}
+					fs.save(ctx)
 					return
 				}
 			}
