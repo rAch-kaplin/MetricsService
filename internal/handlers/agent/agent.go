@@ -46,7 +46,7 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 	}
 }
 
-func sendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
+func SendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 	allMetrics := storage.GetAllMetrics()
 
 	for _, metric := range allMetrics {
@@ -91,18 +91,22 @@ func sendMetric(client *resty.Client, metricJSON *server.Metrics) {
 		1 * time.Second,
 	}
 
-	// buf, err := ConvertToGzipData(metricJSON)
-	// if err != nil {
-	// 	log.Error().Err(err).Msg("Failed to convert metric to gzip")
-	// 	return
-	// }
+	buf, ok, err := ConvertToGzipData(metricJSON)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to convert metric to gzip")
+		return
+	}
 
 	for _, backoff := range backoffSchedule {
-		res, err := client.R().
+		req := client.R().
 			SetHeader("Content-Type", "application/json").
-			SetHeader("Content-Encoding", "gzip").
-			SetBody(metricJSON).
-			Post("update/")
+			SetBody(buf)
+
+		if ok {
+			req.SetHeader("Content-Encoding", "gzip")
+		}
+
+		res, err := req.Post("update/")
 
 		if err != nil || res.StatusCode() != http.StatusOK {
 		} else {
@@ -113,15 +117,24 @@ func sendMetric(client *resty.Client, metricJSON *server.Metrics) {
 	}
 }
 
-func ConvertToGzipData(metricJSON *server.Metrics) (*bytes.Buffer, error) {
+func ConvertToGzipData(metricJSON *server.Metrics) (*bytes.Buffer, bool, error) {
 	jsonData, err := easyjson.Marshal(*metricJSON)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to marshal metricJSON")
-		return nil, err
+		return nil, false, err
 	}
 
 	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
+	if len(jsonData) <= 1024 {
+		buf.Write(jsonData)
+		return &buf, false, nil
+	}
+
+	gz, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create gzip writer")
+		return nil, false, err
+	}
 	defer func() {
 		err := gz.Close()
 		if err != nil {
@@ -132,24 +145,8 @@ func ConvertToGzipData(metricJSON *server.Metrics) (*bytes.Buffer, error) {
 	_, err = gz.Write(jsonData)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to write gzip data")
-		return nil, err
+		return nil, false, err
 	}
 
-	return &buf, nil
-}
-
-func CollectionLoop(storage *ms.MemStorage, interval time.Duration) {
-	log.Debug().Msg("collectionLoop ...")
-	for {
-		UpdateAllMetrics(storage)
-		time.Sleep(interval)
-	}
-}
-
-func ReportLoop(client *resty.Client, storage *ms.MemStorage, interval time.Duration) {
-	log.Debug().Msg("reportLoop ...")
-	for {
-		sendAllMetrics(client, storage)
-		time.Sleep(interval)
-	}
+	return &buf, true, nil
 }

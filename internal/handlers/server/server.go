@@ -1,8 +1,10 @@
 package server
 
 import (
+	"compress/gzip"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -25,25 +27,6 @@ type MetricTable struct {
 	Name  string
 	Type  string
 	Value string
-}
-
-func NewRouter(storage ms.Collector) http.Handler {
-	r := chi.NewRouter()
-
-	r.Use(WithLogging)
-	r.Use(WithGzipCompress)
-
-	r.Route("/", func(r chi.Router) {
-		r.Get("/", GetAllMetrics(storage))
-		r.Route("/", func(r chi.Router) {
-			r.Post("/update/", UpdateMetricsHandlerJSON(storage))
-			r.Post("/value/", GetMetricsHandlerJSON(storage))
-			r.Get("/value/{mType}/{mName}", GetMetric(storage))
-			r.Post("/update/{mType}/{mName}/{mValue}", UpdateMetric(storage))
-		})
-	})
-
-	return r
 }
 
 func ConvertByType(mType, mValue string) (any, error) {
@@ -247,6 +230,7 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		var metric Metrics
 
+		log.Info().Msg("GetMetricsHandlerJSON called\n\n")
 		if req.Header.Get("Content-Type") != "application/json" {
 			http.Error(resp, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -256,6 +240,7 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			http.Error(resp, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
 			return
 		}
+		log.Info().Msgf("Received metric request: %+v", metric)
 
 		if !FillMetricValueFromStorage(storage, &metric) {
 			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
@@ -267,11 +252,29 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			http.Error(resp, fmt.Sprintf("failed to encode json: %v", err), http.StatusInternalServerError)
 			return
 		}
+		log.Info().Msg("Metric successfully returned\n\n")
 	}
 }
 
 func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
+		var reader io.Reader
+		if req.Header.Get("Content-Encoding") == "gzip" {
+			gz, err := gzip.NewReader(req.Body)
+			if err != nil {
+				http.Error(resp, "failed to create gzip reader", http.StatusBadRequest)
+				return
+			}
+			defer func() {
+				if err := gz.Close(); err != nil {
+					log.Error().Err(err).Msg("failed close gz reader")
+				}
+			}()
+			reader = gz
+		} else {
+			reader = req.Body
+		}
+
 		var metric Metrics
 
 		if req.Header.Get("Content-Type") != "application/json" {
@@ -279,7 +282,7 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			return
 		}
 
-		if err := easyjson.UnmarshalFromReader(req.Body, &metric); err != nil {
+		if err := easyjson.UnmarshalFromReader(reader, &metric); err != nil {
 			http.Error(resp, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
 			return
 		}

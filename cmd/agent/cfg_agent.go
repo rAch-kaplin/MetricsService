@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/caarlos0/env/v6"
@@ -77,7 +80,18 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("invalid address %s: %w", opts.endPointAddr, err)
 		}
 
-		startAgent()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+		go func(){
+			<-stop
+			cancel()
+		}()
+
+		startAgent(ctx)
 
 		return nil
 	},
@@ -93,7 +107,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&opts.reportInterval, "r", "r", opts.reportInterval, "PollInterval value")
 }
 
-func startAgent() {
+func startAgent(ctx context.Context) {
 	storage := ms.NewMemStorage()
 
 	client := resty.New().
@@ -102,8 +116,21 @@ func startAgent() {
 
 	log.Info().Msg("Starting collection and reporting loops")
 
-	go agent.CollectionLoop(storage, time.Duration(opts.pollInterval)*time.Second)
-	go agent.ReportLoop(client, storage, time.Duration(opts.reportInterval)*time.Second)
+	pollTimer := time.NewTicker(time.Duration(opts.pollInterval) * time.Second)
+	reportTimer := time.NewTicker(time.Duration(opts.reportInterval) * time.Second)
 
-	select {}
+	defer pollTimer.Stop()
+	defer reportTimer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-pollTimer.C:
+			agent.UpdateAllMetrics(storage)
+		case <-reportTimer.C:
+			agent.SendAllMetrics(client, storage)
+		}
+	}
 }
