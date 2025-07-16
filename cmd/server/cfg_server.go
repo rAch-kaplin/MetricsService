@@ -48,7 +48,8 @@ func init() {
 }
 
 func PreRunE(cmd *cobra.Command, args []string) error {
-	opts, err := config.ParseOptionsFromCmdAndEnvs(cmd, &config.Options{
+	var err error
+	opts, err = config.ParseOptionsFromCmdAndEnvs(cmd, &config.Options{
 		EndPointAddr:    endPointAddr,
 		StoreInterval:   storeInterval,
 		FileStoragePath: fileStoragePath,
