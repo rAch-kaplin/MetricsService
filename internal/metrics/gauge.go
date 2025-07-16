@@ -24,15 +24,13 @@ func (g *gauge) Value() any {
 	return g.value
 }
 
-func (g *gauge) Update(mName string, mValue any) error {
-	mtrValue, ok := mValue.(float64)
-	if !ok {
-		return ErrInvalidValueType
-	}
-
-	g.value = mtrValue
-
-	return nil
+func (g *gauge) Update(mValue any) error {
+	value, ok := mValue.(float64)
+    if !ok {
+        return ErrInvalidValueType
+    }
+    g.value = value
+    return nil
 }
 
 func (g *gauge) SetValue(v any) error {

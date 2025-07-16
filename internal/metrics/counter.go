@@ -24,15 +24,13 @@ func (c *counter) Value() any {
 	return c.value
 }
 
-func (c *counter) Update(mName string, mValue any) error {
-	mtrValue, ok := mValue.(int64)
-	if !ok {
-		return ErrInvalidValueType
-	}
-
-	c.value += mtrValue
-
-	return nil
+func (c *counter) Update(mValue any) error {
+	value, ok := mValue.(int64)
+    if !ok {
+        return ErrInvalidValueType
+    }
+    c.value += value
+    return nil
 }
 
 func (c *counter) SetValue(v any) error {
