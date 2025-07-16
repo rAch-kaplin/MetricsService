@@ -265,7 +265,7 @@ func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 			reader = req.Body
 		}
 
-		var metric mtr.Metrics
+		var metric serialize.Metric
 
 		log.Info().Msg("UpdateMetricsHandlerJSON called")
 		if req.Header.Get("Content-Type") != "application/json" {

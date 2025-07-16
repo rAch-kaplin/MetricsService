@@ -118,7 +118,7 @@ func sendMetric(client *resty.Client, metricJSON *serialize.Metric) {
 	}
 }
 
-func ConvertToGzipData(metricJSON *mtr.Metrics) (*bytes.Buffer, bool, error) {
+func ConvertToGzipData(metricJSON *serialize.Metric) (*bytes.Buffer, bool, error) {
 	jsonData, err := easyjson.Marshal(*metricJSON)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to marshal metricJSON")
