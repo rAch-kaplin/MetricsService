@@ -53,8 +53,8 @@ func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, bo
 	defer db.mutex.RUnlock()
 
 	row := db.DB.QueryRowContext(ctx,
-		`SELECT "ID", "MType", "Delta", "Value" FROM collector ` +
-    	`WHERE "ID" = $1 AND "MType" = $2 LIMIT 1`, mName, mType)
+		`SELECT "ID", "MType", "Delta", "Value" FROM collector `+
+			`WHERE "ID" = $1 AND "MType" = $2 LIMIT 1`, mName, mType)
 
 	var (
 		id    string
@@ -102,7 +102,11 @@ func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
 		log.Error().Err(err).Msg("The request was not processed")
 		return nil
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("failed to close rows: %v", err)
+		}
+	}()
 
 	var (
 		delta sql.NullInt64
