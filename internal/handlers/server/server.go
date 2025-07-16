@@ -15,10 +15,10 @@ import (
 )
 
 type Metrics struct {
-    ID    string   `json:"id"`
-    MType string   `json:"type"`
-    Delta *int64   `json:"delta,omitempty"`
-    Value *float64 `json:"value,omitempty"`
+	ID    string   `json:"id"`
+	MType string   `json:"type"`
+	Delta *int64   `json:"delta,omitempty"`
+	Value *float64 `json:"value,omitempty"`
 }
 
 type MetricTable struct {
@@ -31,6 +31,7 @@ func NewRouter(storage ms.Collector) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(WithLogging)
+	r.Use(WithGzipCompress)
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", GetAllMetrics(storage))
@@ -176,8 +177,6 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 		if err := template.Execute(res, metricsToTable); err != nil {
 			log.Error().Msgf("failed complete template: %v", err)
 		}
-
-		res.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -218,8 +217,6 @@ func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 			Str("metric_name", mName).
 			Interface("value", val).
 			Msg("Metric updated successfully")
-
-		res.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -265,15 +262,10 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			return
 		}
 
-		started, n, err := easyjson.MarshalToHTTPResponseWriter(&metric, resp)
-		if err != nil {
-			if !started {
-				http.Error(resp, "failed to encode json", http.StatusInternalServerError)
-			} else {
-				log.Error().Err(err).
-					Int("written_bytes", n).
-					Msg("error while writing json response")
-			}
+		resp.Header().Set("Content-Type", "application/json")
+		if _, err := easyjson.MarshalToWriter(&metric, resp); err != nil {
+			http.Error(resp, fmt.Sprintf("failed to encode json: %v", err), http.StatusInternalServerError)
+			return
 		}
 	}
 }
@@ -308,15 +300,10 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			return
 		}
 
-		started, n, err := easyjson.MarshalToHTTPResponseWriter(&metric, resp)
-		if err != nil {
-			if !started {
-				http.Error(resp, "failed to encode json", http.StatusInternalServerError)
-			} else {
-				log.Error().Err(err).
-					Int("written_bytes", n).
-					Msg("error while writing json response")
-			}
+		resp.Header().Set("Content-Type", "application/json")
+		if _, err := easyjson.MarshalToWriter(&metric, resp); err != nil {
+			http.Error(resp, fmt.Sprintf("failed to encode json: %v", err), http.StatusInternalServerError)
+			return
 		}
 	}
 }

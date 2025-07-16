@@ -26,11 +26,6 @@ func (res *loggingResponseWriter) Write(body []byte) (int, error) {
 	return size, err
 }
 
-func (res *loggingResponseWriter) WriteHeader(statusCode int) {
-	res.ResponseWriter.WriteHeader(statusCode)
-	res.responseData.status = statusCode
-}
-
 func WithLogging(h http.Handler) http.Handler {
 	logfn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
