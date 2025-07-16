@@ -189,7 +189,9 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 			m = mtr.NewCounter(mName, newVal)
 		} else {
 			m = mtr.NewCounter(mName, oldValue.(int64))
-			m.Update(newVal)
+			if err := m.Update(newVal); err != nil {
+				return fmt.Errorf("failed update metric %v", err)
+			}
 		}
 
 	default:
@@ -236,7 +238,11 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 
 	if err != nil {
 		log.Error().Err(err).Msg("failed update insert into collector")
-		tx.Rollback()
+
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			log.Printf("failed to rollback transaction: %v", err)
+		}
+
 		return fmt.Errorf("failed update insert into collector: %w", err)
 	}
 
