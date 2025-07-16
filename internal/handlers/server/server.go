@@ -231,11 +231,18 @@ func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 			return
 		}
 
-		if !FillMetricValueFromStorage(req.Context(), storage, &metric) {
-			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
+		value, err := storage.GetMetric(req.Context(), metric.MType, metric.ID)
+		if err != nil {
+			log.Error().Err(err).Msg("can't get valid metric")
+			http.Error(resp, "can't get valid metric", http.StatusNotFound)
 			return
 		}
-		log.Info().Msgf("Received metric request: %+v", metric)
+
+		if err := metric.SetValue(value); err != nil {
+			log.Error().Err(err).Msg("can't set new value")
+			http.Error(resp, "can't set new value", http.StatusInternalServerError)
+			return
+		}
 
 		resp.Header().Set("Content-Type", "application/json")
 		if _, err := easyjson.MarshalToWriter(&metric, resp); err != nil {
@@ -278,11 +285,11 @@ func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 			return
 		}
 
-		var value any
-		if metric.MType == mtr.GaugeType {
-			value = *metric.Value
-		} else {
-			value = *metric.Delta
+		value, err := metric.GetValue()
+		if err != nil {
+			log.Error().Err(err).Msg("can't get value")
+			http.Error(resp, "can't get value", http.StatusBadRequest)
+			return
 		}
 
 		if err := storage.UpdateMetric(req.Context(), metric.MType, metric.ID, value); err != nil {
