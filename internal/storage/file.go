@@ -93,20 +93,20 @@ func (fs *FileStorage) UpdateMetric(ctx context.Context, mType, mName string, mV
 	return nil
 }
 
-func (fs *FileStorage) GetMetric(ctx context.Context, mType, mName string) (any, bool) {
+func (fs *FileStorage) GetMetric(ctx context.Context, mType, mName string) (any, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
-	val, ok := fs.storage.GetMetric(ctx, mType, mName)
-	if !ok {
+	val, err := fs.storage.GetMetric(ctx, mType, mName)
+	if err != nil {
 		log.Error().
 			Str("type", mType).
 			Str("name", mName).
 			Msg("can't get valid metric")
-		return nil, false
+		return nil, fmt.Errorf("can't get valid metric: %v", err)
 	}
 
-	return val, true
+	return val, nil
 }
 
 func (fs *FileStorage) GetAllMetrics(ctx context.Context) []mtr.Metric {

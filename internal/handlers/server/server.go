@@ -42,8 +42,8 @@ func GetMetric(storage col.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
-		value, found := storage.GetMetric(req.Context(), mType, mName)
-		if !found {
+		value, err := storage.GetMetric(req.Context(), mType, mName)
+		if err != nil {
 			http.Error(res, fmt.Sprintf("Metric %s was not found", mName), http.StatusNotFound)
 			return
 		}
@@ -62,7 +62,7 @@ func GetMetric(storage col.Collector) http.HandlerFunc {
 		res.Header().Set("Content-Type", "text/plain")
 		res.WriteHeader(http.StatusOK)
 
-		_, err := res.Write([]byte(valueStr))
+		_, err = res.Write([]byte(valueStr))
 		if err != nil {
 			log.Error().Msgf("Failed to write response: %v", err)
 
@@ -194,8 +194,8 @@ func UpdateMetric(storage col.Collector) http.HandlerFunc {
 }
 
 func FillMetricValueFromStorage(ctx context.Context, storage col.Collector, metric *serialize.Metric) bool {
-	value, ok := storage.GetMetric(ctx, metric.MType, metric.ID)
-	if !ok {
+	value, err := storage.GetMetric(ctx, metric.MType, metric.ID)
+	if err != nil {
 		return false
 	}
 

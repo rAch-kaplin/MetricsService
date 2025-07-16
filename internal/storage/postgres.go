@@ -3,13 +3,14 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
-	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
+	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	"github.com/rs/zerolog/log"
 )
 
@@ -30,7 +31,7 @@ func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error)
 		"CREATE TABLE IF NOT EXISTS collector ("+
 			"\"ID\" VARCHAR(250) PRIMARY KEY,"+
 			"\"MType\" TEXT,"+
-			"\"Delta\" INTEGER,"+
+			"\"Delta\" BIGINT,"+
 			"\"Value\" DOUBLE PRECISION"+
 			");")
 
@@ -49,7 +50,7 @@ func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error)
 	}, nil
 }
 
-func (db *Database) getMetric(ctx context.Context, mType, mName string) (any, bool) {
+func (db *Database) getMetric(ctx context.Context, mType, mName string) (any, error) {
 	row := db.DB.QueryRowContext(ctx,
 		`SELECT "ID", "MType", "Delta", "Value" FROM collector `+
 			`WHERE "ID" = $1 AND "MType" = $2 LIMIT 1`, mName, mType)
@@ -62,32 +63,33 @@ func (db *Database) getMetric(ctx context.Context, mType, mName string) (any, bo
 	)
 
 	err := row.Scan(&id, &Type, &delta, &value)
-	if err != nil {
-		log.Error().Err(err).Msg("failed scan row")
-		return nil, false
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, mtr.ErrMetricsNotFound
+	} else if err != nil {
+		return nil, fmt.Errorf("row.Scan can't read: %w", err)
 	}
 
 	switch {
 	case value.Valid:
 		if Type != mtr.GaugeType {
-			return nil, false
+			return nil, mtr.ErrInvalidMetricsType
 		}
 
-		return value.Float64, true
+		return value.Float64, nil
 
 	case delta.Valid:
 		if Type != mtr.CounterType {
-			return nil, false
+			return nil, mtr.ErrInvalidMetricsType
 		}
 
-		return delta.Int64, true
+		return delta.Int64, nil
 	default:
 		log.Error().Msg("not valid value")
-		return nil, false
+		return nil, mtr.ErrInvalidValueType
 	}
 }
 
-func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, bool) {
+func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, error) {
 	db.mutex.RLock()
 	defer db.mutex.RUnlock()
 
@@ -103,28 +105,29 @@ func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, bo
 	)
 
 	err := row.Scan(&id, &Type, &delta, &value)
-	if err != nil {
-		log.Error().Err(err).Msg("failed scan row")
-		return nil, false
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, mtr.ErrMetricsNotFound
+	} else if err != nil {
+		return nil, fmt.Errorf("row.Scan can't read: %w", err)
 	}
 
 	switch {
 	case value.Valid:
 		if Type != mtr.GaugeType {
-			return nil, false
+			return nil, mtr.ErrInvalidMetricsType
 		}
 
-		return value.Float64, true
+		return value.Float64, nil
 
 	case delta.Valid:
 		if Type != mtr.CounterType {
-			return nil, false
+			return nil, mtr.ErrInvalidMetricsType
 		}
 
-		return delta.Int64, true
+		return delta.Int64, nil
 	default:
 		log.Error().Msg("not valid value")
-		return nil, false
+		return nil, mtr.ErrInvalidValueType
 	}
 }
 
@@ -202,31 +205,32 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 
-	oldValue, ok := db.getMetric(ctx, mType, mName)
+	oldValue, err := db.getMetric(ctx, mType, mName)
 
 	var m mtr.Metric
 
-	if !ok {
-		switch v := mValue.(type) {
-		case float64:
-			m = mtr.NewGauge(mName, v)
-		case int64:
-			m = mtr.NewCounter(mName, v)
-		default:
-			return fmt.Errorf("unsupported type for metric value: %T", mValue)
+	switch newVal := mValue.(type) {
+	case float64:
+		if mType != mtr.GaugeType {
+			return mtr.ErrInvalidMetricsType
 		}
-	} else {
-		switch v := oldValue.(type) {
-		case float64:
-			m = mtr.NewGauge(mName, v)
-		case int64:
-			m = mtr.NewCounter(mName, v)
-		default:
-			return fmt.Errorf("unsupported type for existing metric: %T", oldValue)
+		m = mtr.NewGauge(mName, newVal)
+
+	case int64:
+		if mType != mtr.CounterType {
+			return mtr.ErrInvalidMetricsType
+		}
+		if errors.Is(err, mtr.ErrMetricsNotFound) {
+			m = mtr.NewCounter(mName, newVal)
+		} else {
+			m = mtr.NewCounter(mName, oldValue.(int64))
+			m.Update(newVal)
 		}
 
-		m.Update(mValue)
+	default:
+		return fmt.Errorf("unsupported metric type %T", mValue)
 	}
+
 	metric := serialize.Metric{
 		ID:    mName,
 		MType: mType,
@@ -251,7 +255,7 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 		return fmt.Errorf("unknown metric type: %s", metric.MType)
 	}
 
-	_, err := db.DB.ExecContext(ctx,
+	_, err = db.DB.ExecContext(ctx,
 		`INSERT INTO collector ("ID", "MType", "Delta", "Value")
 		 VALUES ($1, $2, $3, $4)
 		 ON CONFLICT ("ID") DO UPDATE
