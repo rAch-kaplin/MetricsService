@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
@@ -42,18 +43,60 @@ func SaveToDB(collector ms.Collector, path string) error {
 		data = append(data, newMetric)
 	}
 
-	bytes, err := json.MarshalIndent(data, "", " ")
-	if err != nil {
-		return fmt.Errorf("json Marshal Indent err: %w", err)
+	if len(data) == 0 {
+		log.Warn().Msg("No metrics to save, skipping file write")
+		return nil
 	}
 
-	return os.WriteFile(path, bytes, 0666)
+	bytes, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("json marshal error: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	tmpPath := path + ".tmp"
+	file, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Error().Err(err).Msg("failed to close file")
+		}
+	}()
+
+	if _, err := file.Write(bytes); err != nil {
+		return fmt.Errorf("write failed: %w", err)
+	}
+
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("sync failed: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("rename failed: %w", err)
+	}
+
+	log.Info().
+		Str("path", path).
+		Int("metrics_saved", len(data)).
+		Msg("Metrics successfully saved")
+
+	return nil
 }
 
 func LoadFromDB(collector ms.Collector, path string) error {
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("can't read file %s with DB %w", path, err)
+	}
+
+	if len(bytes) == 0 {
+		log.Warn().Msgf("DB file %s is empty, skipping restore", path)
+		return nil
 	}
 
 	var data []mtr.Metrics

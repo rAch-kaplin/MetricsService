@@ -15,19 +15,21 @@ all: build
 
 build: server agent
 
-server:
+server: deps
 	@go build -o $(SERVER_FULL_PATH) $(SERVER_SRC_DIR)
 	@echo "Built $(SERVER_FULL_PATH)"
 
-agent:
+agent: deps
 	@go build -o $(AGENT_FULL_PATH) $(AGENT_SRC_DIR)
 	@echo "Built $(AGENT_FULL_PATH)"
 
 test:
 	@go test ./... -v
 
-lint:
+deps:
 	@go mod download
+
+lint: deps
 	@golangci-lint run
 
 clean:

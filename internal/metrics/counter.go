@@ -26,11 +26,11 @@ func (c *counter) Value() any {
 
 func (c *counter) Update(mValue any) error {
 	value, ok := mValue.(int64)
-    if !ok {
-        return ErrInvalidValueType
-    }
-    c.value += value
-    return nil
+	if !ok {
+		return ErrInvalidValueType
+	}
+	c.value += value
+	return nil
 }
 
 func (c *counter) SetValue(v any) error {

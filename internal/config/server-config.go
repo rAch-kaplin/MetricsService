@@ -12,7 +12,7 @@ import (
 const (
 	DefaultEndpoint        = "localhost:8080"
 	DefaultStoreInterval   = 300
-	DefaultFileStoragePath = "/temp/metrics-db.json"
+	DefaultFileStoragePath = "/tmp/metrics-db.json"
 	DefaultRestoreOnStart  = true
 	DefaultDataBaseDSN     = ""
 )
@@ -33,111 +33,120 @@ type EnvConfig struct {
 	DataBaseDSN     string `env:"DATABASE_DSN"`
 }
 
-func NewServerOptions(envOpts, flagOpts []func(*Options)) *Options {
+type Option func(*Options)
+
+func NewServerOptions(options ...Option) *Options {
 	opts := &Options{
 		EndPointAddr:    DefaultEndpoint,
 		StoreInterval:   DefaultStoreInterval,
 		FileStoragePath: DefaultFileStoragePath,
 		RestoreOnStart:  DefaultRestoreOnStart,
+		DataBaseDSN:     DefaultDataBaseDSN,
 	}
 
-	for _, opt := range flagOpts {
-		opt(opts)
-	}
-
-	for _, opt := range envOpts {
+	for _, opt := range options {
 		opt(opts)
 	}
 
 	return opts
 }
 
-func WithAddress(addr string) func(*Options) {
+func WithAddress(addr string) Option {
 	return func(o *Options) {
 		o.EndPointAddr = addr
 	}
 }
 
-func WithStoreInterval(interval int) func(*Options) {
+func WithStoreInterval(interval int) Option {
 	return func(o *Options) {
 		o.StoreInterval = interval
 	}
 }
 
-func WithFileStoragePath(path string) func(*Options) {
+func WithFileStoragePath(path string) Option {
 	return func(o *Options) {
 		o.FileStoragePath = path
 	}
 }
 
-func WithRestoreOnStart(restore bool) func(*Options) {
+func WithRestoreOnStart(restore bool) Option {
 	return func(o *Options) {
 		o.RestoreOnStart = restore
 	}
 }
 
-func WithDataBaseDSN(dataBaseDSN string) func(*Options) {
+func WithDataBaseDSN(dsn string) Option {
 	return func(o *Options) {
-		o.DataBaseDSN = dataBaseDSN
+		o.DataBaseDSN = dsn
 	}
 }
 
-func ParseOptionsFromCmd(cmd *cobra.Command, endPointAddr string, storeInterval int, fileStoragePath string,
-						restoreOnStart bool, dataBaseDSN string) (*Options, error) {
-	var envCfg EnvConfig
-	if err := env.Parse(&envCfg); err != nil {
-		return nil, fmt.Errorf("failed to parse environment: %w", err)
+func ParseOptionsFromCmdAndEnvs(cmd *cobra.Command, src *Options) (*Options, error) {
+	opts, err := ParseFlags(cmd, src)
+	if err != nil {
+		return nil, err
 	}
 
-	var envOpts []func(*Options)
-	if envCfg.DataBaseDSN != "" {
-		cleanDSN := strings.Trim(envCfg.DataBaseDSN, "'")
-		envOpts = append(envOpts, WithDataBaseDSN(cleanDSN))
+	if err := ParseEnvs(cmd, opts); err != nil {
+		return nil, err
 	}
-	if envCfg.EndPointAddr != "" {
-		envOpts = append(envOpts, WithAddress(envCfg.EndPointAddr))
-	}
-	if envCfg.StoreInterval < 0 {
-		return nil, fmt.Errorf("store interval must be >= 0, got %d", envCfg.StoreInterval)
-	} else {
-		envOpts = append(envOpts, WithStoreInterval(envCfg.StoreInterval))
-	}
-	if envCfg.FileStoragePath != "" {
-		envOpts = append(envOpts, WithFileStoragePath(envCfg.FileStoragePath))
-	}
-	envOpts = append(envOpts, WithRestoreOnStart(envCfg.RestoreOnStart))
-
-	var flagOpts []func(*Options)
-	if cmd.Flags().Changed("d") {
-		flagOpts = append(flagOpts, WithDataBaseDSN(dataBaseDSN))
-	}
-	if cmd.Flags().Changed("a") {
-		flagOpts = append(flagOpts, WithAddress(endPointAddr))
-	}
-
-	if cmd.Flags().Changed("i") {
-		if storeInterval < 0 {
-			return nil, fmt.Errorf("store interval flag must be >= 0, got %d", storeInterval)
-		}
-		flagOpts = append(flagOpts, WithStoreInterval(storeInterval))
-	}
-
-	if cmd.Flags().Changed("f") {
-		if fileStoragePath == "" {
-			return nil, fmt.Errorf("file storage path flag cannot be empty")
-		}
-		flagOpts = append(flagOpts, WithFileStoragePath(fileStoragePath))
-	}
-
-	if cmd.Flags().Changed("r") {
-		flagOpts = append(flagOpts, WithRestoreOnStart(restoreOnStart))
-	}
-
-	opts := NewServerOptions(envOpts, flagOpts)
 
 	if _, _, err := net.SplitHostPort(opts.EndPointAddr); err != nil {
 		return nil, fmt.Errorf("invalid address %s: %w", opts.EndPointAddr, err)
 	}
 
 	return opts, nil
+}
+
+func ParseFlags(cmd *cobra.Command, src *Options) (*Options, error) {
+	opts := *src
+
+	if cmd.Flags().Changed("d") {
+		opts.DataBaseDSN = src.DataBaseDSN
+	}
+	if cmd.Flags().Changed("a") {
+		opts.EndPointAddr = src.EndPointAddr
+	}
+	if cmd.Flags().Changed("i") {
+		if src.StoreInterval < 0 {
+			return nil, fmt.Errorf("store interval must be >= 0, got %d", src.StoreInterval)
+		}
+		opts.StoreInterval = src.StoreInterval
+	}
+	if cmd.Flags().Changed("f") {
+		if src.FileStoragePath == "" {
+			return nil, fmt.Errorf("file storage path flag cannot be empty")
+		}
+		opts.FileStoragePath = src.FileStoragePath
+	}
+	if cmd.Flags().Changed("r") {
+		opts.RestoreOnStart = src.RestoreOnStart
+	}
+
+	return &opts, nil
+}
+
+func ParseEnvs(cmd *cobra.Command, opts *Options) error {
+	var envCfg EnvConfig
+	if err := env.Parse(&envCfg); err != nil {
+		return fmt.Errorf("failed to parse environment: %w", err)
+	}
+
+	if envCfg.DataBaseDSN != "" {
+		cleanDSN := strings.Trim(envCfg.DataBaseDSN, "'")
+		opts.DataBaseDSN = cleanDSN
+	}
+
+	if envCfg.EndPointAddr != "" {
+		opts.EndPointAddr = envCfg.EndPointAddr
+	}
+	if envCfg.StoreInterval > 0 {
+		opts.StoreInterval = envCfg.StoreInterval
+	}
+	if envCfg.FileStoragePath != "" {
+		opts.FileStoragePath = envCfg.FileStoragePath
+	}
+	opts.RestoreOnStart = envCfg.RestoreOnStart
+
+	return nil
 }

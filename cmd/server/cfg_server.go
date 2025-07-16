@@ -48,8 +48,21 @@ func init() {
 }
 
 func PreRunE(cmd *cobra.Command, args []string) error {
-	var err error
-	opts, err = config.ParseOptionsFromCmd(cmd, endPointAddr, storeInterval, fileStoragePath, restoreOnStart, dataBaseDSN)
+	opts, err := config.ParseOptionsFromCmdAndEnvs(cmd, &config.Options{
+		EndPointAddr:    endPointAddr,
+		StoreInterval:   storeInterval,
+		FileStoragePath: fileStoragePath,
+		RestoreOnStart:  restoreOnStart,
+		DataBaseDSN:     dataBaseDSN})
+
+	opts = config.NewServerOptions(
+		config.WithAddress(opts.EndPointAddr),
+		config.WithStoreInterval(opts.StoreInterval),
+		config.WithFileStoragePath(opts.FileStoragePath),
+		config.WithRestoreOnStart(opts.RestoreOnStart),
+		config.WithDataBaseDSN(opts.DataBaseDSN),
+	)
+
 	return err
 }
 
@@ -108,6 +121,7 @@ func startServer(ctx context.Context, opts *config.Options, db *sql.DB) error {
 	r := router.NewRouter(storage, opts, db)
 
 	if opts.RestoreOnStart {
+		log.Debug().Msg("restoreOnStart")
 		if err := database.LoadFromDB(storage, opts.FileStoragePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("LoadFromDB error %w", err)
 		}
