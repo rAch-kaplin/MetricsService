@@ -14,6 +14,7 @@ import (
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -218,7 +219,7 @@ func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		var metric mtr.Metrics
 
-		log.Info().Msg("GetMetricsHandlerJSON called\n\n")
+		log.Info().Msg("GetMetricsHandlerJSON called")
 		if req.Header.Get("Content-Type") != "application/json" {
 			http.Error(resp, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -228,12 +229,12 @@ func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 			http.Error(resp, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
 			return
 		}
-		log.Info().Msgf("Received metric request: %+v", metric)
 
 		if !FillMetricValueFromStorage(req.Context(), storage, &metric) {
 			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
 			return
 		}
+		log.Info().Msgf("Received metric request: %+v", metric)
 
 		resp.Header().Set("Content-Type", "application/json")
 		if _, err := easyjson.MarshalToWriter(&metric, resp); err != nil {
@@ -265,6 +266,7 @@ func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 
 		var metric mtr.Metrics
 
+		log.Info().Msg("UpdateMetricsHandlerJSON called")
 		if req.Header.Get("Content-Type") != "application/json" {
 			http.Error(resp, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -296,6 +298,38 @@ func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 			http.Error(resp, fmt.Sprintf("failed to encode json: %v", err), http.StatusInternalServerError)
 			return
 		}
+	}
+}
+
+func UpdatesMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		var jsonMetrics mtr.MetricsList
+
+		log.Info().Msg("UpdatesMetricsHandlerJSON called")
+		if req.Header.Get("Content-Type") != "application/json" {
+			http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+			return
+		}
+
+		if err := easyjson.UnmarshalFromReader(req.Body, &jsonMetrics); err != nil {
+			http.Error(w, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		metrics, err := converter.ConvertMetrics(jsonMetrics)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid convert metrics: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		for _, metric := range metrics {
+			if err := storage.UpdateMetric(req.Context(), metric.Type(), metric.Name(), metric.Value()); err != nil {
+				http.Error(w, fmt.Sprintf("failed update metric %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusOK)
 	}
 }
 

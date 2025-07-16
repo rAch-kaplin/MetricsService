@@ -32,6 +32,10 @@ func NewRouter(storage col.Collector, opts *config.Options) http.Handler {
 		r.Route("/ping", func(r chi.Router) {
 			r.Get("/", server.PingHandler(storage))
 		})
+
+		r.Route("/updates", func(r chi.Router) {
+			r.Post("/", server.UpdatesMetricsHandlerJSON(storage))
+		})
 	})
 
 	return r

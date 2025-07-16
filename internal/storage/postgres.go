@@ -48,6 +48,44 @@ func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error)
 	}, nil
 }
 
+func (db *Database) getMetric(ctx context.Context, mType, mName string) (any, bool) {
+	row := db.DB.QueryRowContext(ctx,
+		`SELECT "ID", "MType", "Delta", "Value" FROM collector `+
+			`WHERE "ID" = $1 AND "MType" = $2 LIMIT 1`, mName, mType)
+
+	var (
+		id    string
+		Type  string
+		delta sql.NullInt64
+		value sql.NullFloat64
+	)
+
+	err := row.Scan(&id, &Type, &delta, &value)
+	if err != nil {
+		log.Error().Err(err).Msg("failed scan row")
+		return nil, false
+	}
+
+	switch {
+	case value.Valid:
+		if Type != mtr.GaugeType {
+			return nil, false
+		}
+
+		return value.Float64, true
+
+	case delta.Valid:
+		if Type != mtr.CounterType {
+			return nil, false
+		}
+
+		return delta.Int64, true
+	default:
+		log.Error().Msg("not valid value")
+		return nil, false
+	}
+}
+
 func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, bool) {
 	db.mutex.RLock()
 	defer db.mutex.RUnlock()
@@ -163,29 +201,53 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 
-	m := mtr.Metrics{
+	oldValue, ok := db.getMetric(ctx, mType, mName)
+
+	var m mtr.Metric
+
+	if !ok {
+		switch v := mValue.(type) {
+		case float64:
+			m = mtr.NewGauge(mName, v)
+		case int64:
+			m = mtr.NewCounter(mName, v)
+		default:
+			return fmt.Errorf("unsupported type for metric value: %T", mValue)
+		}
+	} else {
+		switch v := oldValue.(type) {
+		case float64:
+			m = mtr.NewGauge(mName, v)
+		case int64:
+			m = mtr.NewCounter(mName, v)
+		default:
+			return fmt.Errorf("unsupported type for existing metric: %T", oldValue)
+		}
+
+		m.Update(mValue)
+	}
+	metric := mtr.Metrics{
 		ID:    mName,
 		MType: mType,
 	}
-
 	//TODO - make method maybe for Metrics type
-	switch m.MType {
+	switch metric.MType {
 	case mtr.GaugeType:
-		val, ok := mValue.(float64)
+		val, ok := m.Value().(float64)
 		if !ok {
-			return fmt.Errorf("expected float64 for gauge")
+			return fmt.Errorf("expected float64 for gauge, got %T", m.Value())
 		}
-		m.Value = &val
+		metric.Value = &val
 
 	case mtr.CounterType:
-		val, ok := mValue.(int64)
+		val, ok := m.Value().(int64)
 		if !ok {
-			return fmt.Errorf("expected int64 for counter")
+			return fmt.Errorf("expected int64 for counter, got %T", m.Value())
 		}
-		m.Delta = &val
+		metric.Delta = &val
 
 	default:
-		return fmt.Errorf("unknown metric type: %s", m.MType)
+		return fmt.Errorf("unknown metric type: %s", metric.MType)
 	}
 
 	_, err := db.DB.ExecContext(ctx,
@@ -195,7 +257,7 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 		 SET "Delta" = EXCLUDED."Delta",
 		     "Value" = EXCLUDED."Value",
 		     "MType" = EXCLUDED."MType";`,
-		m.ID, m.MType, m.Delta, m.Value)
+		metric.ID, metric.MType, metric.Delta, metric.Value)
 
 	if err != nil {
 		log.Error().Err(err).Msg("failed update insert into collector")
