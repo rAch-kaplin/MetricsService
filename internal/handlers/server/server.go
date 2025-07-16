@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -257,6 +258,7 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 
 func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
+		var reader io.Reader
 		if req.Header.Get("Content-Encoding") == "gzip" {
 			gz, err := gzip.NewReader(req.Body)
 			if err != nil {
@@ -268,7 +270,9 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 					log.Error().Err(err).Msg("failed close gz reader")
 				}
 			}()
-			req.Body = gz
+			reader = gz
+		} else {
+			reader = req.Body
 		}
 
 		var metric Metrics
@@ -278,7 +282,7 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			return
 		}
 
-		if err := easyjson.UnmarshalFromReader(req.Body, &metric); err != nil {
+		if err := easyjson.UnmarshalFromReader(reader, &metric); err != nil {
 			http.Error(resp, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
 			return
 		}
