@@ -1,6 +1,7 @@
 package server
 
 import (
+	"compress/gzip"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -256,6 +257,20 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 
 func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
+		if req.Header.Get("Content-Encoding") == "gzip" {
+			gz, err := gzip.NewReader(req.Body)
+			if err != nil {
+				http.Error(resp, "failed to create gzip reader", http.StatusBadRequest)
+				return
+			}
+			defer func() {
+				if err := gz.Close(); err != nil {
+					log.Error().Err(err).Msg("failed close gz reader")
+				}
+			}()
+			req.Body = gz
+		}
+
 		var metric Metrics
 
 		if req.Header.Get("Content-Type") != "application/json" {
@@ -291,4 +306,3 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 		}
 	}
 }
-

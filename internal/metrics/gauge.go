@@ -26,11 +26,11 @@ func (g *gauge) Value() any {
 
 func (g *gauge) Update(mValue any) error {
 	value, ok := mValue.(float64)
-    if !ok {
-        return ErrInvalidValueType
-    }
-    g.value = value
-    return nil
+	if !ok {
+		return ErrInvalidValueType
+	}
+	g.value = value
+	return nil
 }
 
 func (g *gauge) SetValue(v any) error {

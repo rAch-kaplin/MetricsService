@@ -9,9 +9,9 @@ import (
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
-var supportedContentType = map[string]bool{
-	"application/json":         true,
-	"text/html; charset=utf-8": true,
+var supportedContentType = map[string]struct{}{
+	"application/json":         {},
+	"text/html; charset=utf-8": {},
 }
 
 type gzipWriter struct {

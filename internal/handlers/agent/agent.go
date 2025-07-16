@@ -91,17 +91,17 @@ func sendMetric(client *resty.Client, metricJSON *server.Metrics) {
 		1 * time.Second,
 	}
 
-	// buf, err := ConvertToGzipData(metricJSON)
-	// if err != nil {
-	// 	log.Error().Err(err).Msg("Failed to convert metric to gzip")
-	// 	return
-	// }
+	buf, err := ConvertToGzipData(metricJSON)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to convert metric to gzip")
+		return
+	}
 
 	for _, backoff := range backoffSchedule {
 		res, err := client.R().
 			SetHeader("Content-Type", "application/json").
 			SetHeader("Content-Encoding", "gzip").
-			SetBody(metricJSON).
+			SetBody(buf).
 			Post("update/")
 
 		if err != nil || res.StatusCode() != http.StatusOK {
