@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -12,21 +13,21 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/mailru/easyjson"
 
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
+	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
-func UpdateAllMetrics(storage *ms.MemStorage) {
+func UpdateAllMetrics(ctx context.Context, storage *storage.MemStorage) {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
 	for _, stat := range rt.MemRuntimeStats {
 		val := stat.Get(&memStats)
 
-		if err := storage.UpdateMetric(stat.Type, stat.Name, val); err != nil {
+		if err := storage.UpdateMetric(ctx, stat.Type, stat.Name, val); err != nil {
 			log.Error().
 				Err(err).
 				Str("metric", stat.Name).
@@ -37,23 +38,23 @@ func UpdateAllMetrics(storage *ms.MemStorage) {
 		log.Debug().Msgf("update metric %s", stat.Name)
 	}
 
-	if err := storage.UpdateMetric(mtr.CounterType, "PollCount", int64(1)); err != nil {
+	if err := storage.UpdateMetric(ctx, mtr.CounterType, "PollCount", int64(1)); err != nil {
 		log.Error().Msgf("Failed to update PollCount metric: %v", err)
 	}
 
-	if err := storage.UpdateMetric(mtr.GaugeType, "RandomValue", rand.Float64()); err != nil {
+	if err := storage.UpdateMetric(ctx, mtr.GaugeType, "RandomValue", rand.Float64()); err != nil {
 		log.Error().Msgf("Failed to update RandomValue metric: %v", err)
 	}
 }
 
-func SendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
-	allMetrics := storage.GetAllMetrics()
+func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.MemStorage) {
+	allMetrics := storage.GetAllMetrics(ctx)
 
 	for _, metric := range allMetrics {
 		mType := metric.Type()
 		mName := metric.Name()
 
-		metricJSON := server.Metrics{
+		metricJSON := serialize.Metric{
 			ID:    mName,
 			MType: mType,
 		}
@@ -84,7 +85,7 @@ func SendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 	}
 }
 
-func sendMetric(client *resty.Client, metricJSON *server.Metrics) {
+func sendMetric(client *resty.Client, metricJSON *serialize.Metric) {
 	backoffSchedule := []time.Duration{
 		100 * time.Millisecond,
 		500 * time.Millisecond,
@@ -117,7 +118,7 @@ func sendMetric(client *resty.Client, metricJSON *server.Metrics) {
 	}
 }
 
-func ConvertToGzipData(metricJSON *server.Metrics) (*bytes.Buffer, bool, error) {
+func ConvertToGzipData(metricJSON *serialize.Metric) (*bytes.Buffer, bool, error) {
 	jsonData, err := easyjson.Marshal(*metricJSON)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to marshal metricJSON")

@@ -2,6 +2,7 @@ package server
 
 import (
 	"compress/gzip"
+	"context"
 	"fmt"
 	"html/template"
 	"io"
@@ -11,23 +12,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/mailru/easyjson"
 
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
+	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
+	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
-
-type Metrics struct {
-	ID    string   `json:"id"`
-	MType string   `json:"type"`
-	Delta *int64   `json:"delta,omitempty"`
-	Value *float64 `json:"value,omitempty"`
-}
-
-type MetricTable struct {
-	Name  string
-	Type  string
-	Value string
-}
 
 func ConvertByType(mType, mValue string) (any, error) {
 	switch mType {
@@ -48,12 +38,12 @@ func ConvertByType(mType, mValue string) (any, error) {
 	}
 }
 
-func GetMetric(storage ms.Collector) http.HandlerFunc {
+func GetMetric(storage col.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
-		value, found := storage.GetMetric(mType, mName)
-		if !found {
+		value, err := storage.GetMetric(req.Context(), mType, mName)
+		if err != nil {
 			http.Error(res, fmt.Sprintf("Metric %s was not found", mName), http.StatusNotFound)
 			return
 		}
@@ -72,7 +62,7 @@ func GetMetric(storage ms.Collector) http.HandlerFunc {
 		res.Header().Set("Content-Type", "text/plain")
 		res.WriteHeader(http.StatusOK)
 
-		_, err := res.Write([]byte(valueStr))
+		_, err = res.Write([]byte(valueStr))
 		if err != nil {
 			log.Error().Msgf("Failed to write response: %v", err)
 
@@ -80,11 +70,11 @@ func GetMetric(storage ms.Collector) http.HandlerFunc {
 	}
 }
 
-func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
+func GetAllMetrics(storage col.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		allMetrics := storage.GetAllMetrics()
+		allMetrics := storage.GetAllMetrics(req.Context())
 
-		var metricsToTable []MetricTable
+		var metricsToTable []mtr.MetricTable
 
 		for _, metric := range allMetrics {
 			var valStr string
@@ -111,7 +101,7 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 				valStr = strconv.FormatInt(val, 10)
 			}
 
-			metricsToTable = append(metricsToTable, MetricTable{
+			metricsToTable = append(metricsToTable, mtr.MetricTable{
 				Name:  mName,
 				Type:  mType,
 				Value: valStr,
@@ -163,7 +153,7 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 	}
 }
 
-func UpdateMetric(storage ms.Collector) http.HandlerFunc {
+func UpdateMetric(storage col.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
@@ -190,7 +180,7 @@ func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 			return
 		}
 
-		if err := storage.UpdateMetric(mType, mName, val); err != nil {
+		if err := storage.UpdateMetric(req.Context(), mType, mName, val); err != nil {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -203,9 +193,9 @@ func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 	}
 }
 
-func FillMetricValueFromStorage(storage ms.Collector, metric *Metrics) bool {
-	value, ok := storage.GetMetric(metric.MType, metric.ID)
-	if !ok {
+func FillMetricValueFromStorage(ctx context.Context, storage col.Collector, metric *serialize.Metric) bool {
+	value, err := storage.GetMetric(ctx, metric.MType, metric.ID)
+	if err != nil {
 		return false
 	}
 
@@ -226,11 +216,11 @@ func FillMetricValueFromStorage(storage ms.Collector, metric *Metrics) bool {
 	return true
 }
 
-func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
+func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
-		var metric Metrics
+		var metric serialize.Metric
 
-		log.Info().Msg("GetMetricsHandlerJSON called\n\n")
+		log.Info().Msg("GetMetricsHandlerJSON called")
 		if req.Header.Get("Content-Type") != "application/json" {
 			http.Error(resp, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -240,10 +230,17 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			http.Error(resp, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
 			return
 		}
-		log.Info().Msgf("Received metric request: %+v", metric)
 
-		if !FillMetricValueFromStorage(storage, &metric) {
-			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
+		value, err := storage.GetMetric(req.Context(), metric.MType, metric.ID)
+		if err != nil {
+			log.Error().Err(err).Msg("can't get valid metric")
+			http.Error(resp, "can't get valid metric", http.StatusNotFound)
+			return
+		}
+
+		if err := metric.SetValue(value); err != nil {
+			log.Error().Err(err).Msg("can't set new value")
+			http.Error(resp, "can't set new value", http.StatusInternalServerError)
 			return
 		}
 
@@ -256,7 +253,7 @@ func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 	}
 }
 
-func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
+func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		var reader io.Reader
 		if req.Header.Get("Content-Encoding") == "gzip" {
@@ -275,8 +272,9 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			reader = req.Body
 		}
 
-		var metric Metrics
+		var metric serialize.Metric
 
+		log.Info().Msg("UpdateMetricsHandlerJSON called")
 		if req.Header.Get("Content-Type") != "application/json" {
 			http.Error(resp, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -287,18 +285,18 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			return
 		}
 
-		var value any
-		if metric.MType == mtr.GaugeType {
-			value = *metric.Value
-		} else {
-			value = *metric.Delta
+		value, err := metric.GetValue()
+		if err != nil {
+			log.Error().Err(err).Msg("can't get value")
+			http.Error(resp, "can't get value", http.StatusBadRequest)
+			return
 		}
 
-		if err := storage.UpdateMetric(metric.MType, metric.ID, value); err != nil {
+		if err := storage.UpdateMetric(req.Context(), metric.MType, metric.ID, value); err != nil {
 			http.Error(resp, fmt.Sprintf("invalid update metric %s: %v", metric.ID, err), http.StatusBadRequest)
 		}
 
-		if !FillMetricValueFromStorage(storage, &metric) {
+		if !FillMetricValueFromStorage(req.Context(), storage, &metric) {
 			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
 			return
 		}
@@ -308,5 +306,47 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			http.Error(resp, fmt.Sprintf("failed to encode json: %v", err), http.StatusInternalServerError)
 			return
 		}
+	}
+}
+
+func UpdatesMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		var jsonMetrics serialize.MetricsList
+
+		log.Info().Msg("UpdatesMetricsHandlerJSON called")
+		if req.Header.Get("Content-Type") != "application/json" {
+			http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+			return
+		}
+
+		if err := easyjson.UnmarshalFromReader(req.Body, &jsonMetrics); err != nil {
+			http.Error(w, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		metrics, err := converter.ConvertMetrics(jsonMetrics)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid convert metrics: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		for _, metric := range metrics {
+			if err := storage.UpdateMetric(req.Context(), metric.Type(), metric.Name(), metric.Value()); err != nil {
+				http.Error(w, fmt.Sprintf("failed update metric %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func PingHandler(col col.Collector) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := col.Ping(r.Context()); err != nil {
+			http.Error(w, "can't ping DB", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	}
 }
