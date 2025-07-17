@@ -10,6 +10,7 @@ import (
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
+	errH "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/errors-handlers"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	"github.com/rs/zerolog/log"
 )
@@ -51,10 +52,6 @@ func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error)
 }
 
 func (db *Database) getMetric(ctx context.Context, mType, mName string) (any, error) {
-	row := db.DB.QueryRowContext(ctx,
-		`SELECT "ID", "MType", "Delta", "Value" FROM collector `+
-			`WHERE "ID" = $1 AND "MType" = $2 LIMIT 1`, mName, mType)
-
 	var (
 		id    string
 		Type  string
@@ -62,7 +59,16 @@ func (db *Database) getMetric(ctx context.Context, mType, mName string) (any, er
 		value sql.NullFloat64
 	)
 
-	err := row.Scan(&id, &Type, &delta, &value)
+	getMtr := func() error {
+		row := db.DB.QueryRowContext(ctx,
+			`SELECT "ID", "MType", "Delta", "Value" FROM collector `+
+				`WHERE "ID" = $1 AND "MType" = $2 LIMIT 1`, mName, mType)
+
+		return row.Scan(&id, &Type, &delta, &value)
+	}
+
+	err := errH.WithRetry(getMtr, errH.IsPostgresRetriableError)
+
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, mtr.ErrMetricsNotFound
 	} else if err != nil {
@@ -227,14 +233,20 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 		return fmt.Errorf("failed begin transaction")
 	}
 
-	_, err = tx.ExecContext(ctx,
-		`INSERT INTO collector ("ID", "MType", "Delta", "Value")
+	execContext := func() error {
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO collector ("ID", "MType", "Delta", "Value")
 		 VALUES ($1, $2, $3, $4)
 		 ON CONFLICT ("ID") DO UPDATE
 		 SET "Delta" = EXCLUDED."Delta",
 		     "Value" = EXCLUDED."Value",
 		     "MType" = EXCLUDED."MType";`,
-		metric.ID, metric.MType, metric.Delta, metric.Value)
+			metric.ID, metric.MType, metric.Delta, metric.Value)
+
+		return err
+	}
+
+	err = errH.WithRetry(execContext, errH.IsPostgresRetriableError)
 
 	if err != nil {
 		log.Error().Err(err).Msg("failed update insert into collector")
