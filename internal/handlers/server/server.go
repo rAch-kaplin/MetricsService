@@ -2,7 +2,6 @@ package server
 
 import (
 	"compress/gzip"
-	"context"
 	"fmt"
 	"html/template"
 	"io"
@@ -193,29 +192,6 @@ func UpdateMetric(storage col.Collector) http.HandlerFunc {
 	}
 }
 
-func FillMetricValueFromStorage(ctx context.Context, storage col.Collector, metric *serialize.Metric) bool {
-	value, err := storage.GetMetric(ctx, metric.MType, metric.ID)
-	if err != nil {
-		return false
-	}
-
-	switch v := value.(type) {
-	case float64:
-		metric.Value = &v
-	case int64:
-		metric.Delta = &v
-	default:
-		log.Error().
-			Str("metricType", metric.MType).
-			Str("metricName", metric.ID).
-			Msg("unsupported metric type")
-
-		return false
-	}
-
-	return true
-}
-
 func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		var metric serialize.Metric
@@ -237,7 +213,7 @@ func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 				Str("type", metric.MType).
 				Str("name", metric.ID).
 				Msg("can't get valid metric")
-				
+
 			http.Error(resp, "can't get valid metric", http.StatusNotFound)
 			return
 		}
@@ -298,9 +274,18 @@ func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 
 		if err := storage.UpdateMetric(req.Context(), metric.MType, metric.ID, value); err != nil {
 			http.Error(resp, fmt.Sprintf("invalid update metric %s: %v", metric.ID, err), http.StatusBadRequest)
+			return
 		}
 
-		if !FillMetricValueFromStorage(req.Context(), storage, &metric) {
+		newValue, err := storage.GetMetric(req.Context(), metric.MType, metric.ID)
+		if err != nil {
+			log.Error().Err(err).Msg("can't get new value metric")
+			http.Error(resp, "can't get new value metric", http.StatusNotFound)
+			return
+		}
+
+		err = metric.SetValue(newValue)
+		if err != nil {
 			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
 			return
 		}
@@ -315,6 +300,23 @@ func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 
 func UpdatesMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		var reader io.Reader
+		if req.Header.Get("Content-Encoding") == "gzip" {
+			gz, err := gzip.NewReader(req.Body)
+			if err != nil {
+				http.Error(w, "failed to create gzip reader", http.StatusBadRequest)
+				return
+			}
+			defer func() {
+				if err := gz.Close(); err != nil {
+					log.Error().Err(err).Msg("failed close gz reader")
+				}
+			}()
+			reader = gz
+		} else {
+			reader = req.Body
+		}
+
 		var jsonMetrics serialize.MetricsList
 
 		log.Info().Msg("UpdatesMetricsHandlerJSON called")
@@ -323,7 +325,7 @@ func UpdatesMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 			return
 		}
 
-		if err := easyjson.UnmarshalFromReader(req.Body, &jsonMetrics); err != nil {
+		if err := easyjson.UnmarshalFromReader(reader, &jsonMetrics); err != nil {
 			http.Error(w, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
 			return
 		}
