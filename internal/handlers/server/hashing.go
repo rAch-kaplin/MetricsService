@@ -14,11 +14,21 @@ import (
 type hashResponseWriter struct {
 	http.ResponseWriter
 	body *bytes.Buffer
+	key  []byte
 }
 
 func (hsw *hashResponseWriter) Write(b []byte) (int, error) {
 	if size, err := hsw.body.Write(b); err != nil {
 		return size, fmt.Errorf("failed write body %v", err)
+	}
+
+	if hsw.key != nil && hsw.body.Len() > 0 {
+		newHash, err := hash.GetHash(hsw.key, hsw.body.Bytes())
+		if err != nil {
+			log.Error().Err(err).Msg("failed to get hash")
+		}
+
+		hsw.Header().Set("HashSHA256", hex.EncodeToString(newHash))
 	}
 
 	return hsw.ResponseWriter.Write(b)
@@ -50,25 +60,18 @@ func WithHashing(key []byte) func(next http.Handler) http.Handler {
 						log.Error().Msg("invalid hash message")
 						http.Error(w, "invalid hash message", http.StatusBadRequest)
 
-						//huinya 
-						//return
+						//huinya
+						// return
 					}
 				}
 
 				hw := &hashResponseWriter{
 					ResponseWriter: w,
 					body:           bytes.NewBuffer(nil),
+					key:            key,
 				}
 
 				next.ServeHTTP(hw, r)
-
-				newHash, err := hash.GetHash(key, hw.body.Bytes())
-				if err != nil {
-					log.Error().Err(err).Msg("failed to get hash")
-					return
-				}
-
-				w.Header().Set("HashSHA256", hex.EncodeToString(newHash))
 			}
 		})
 	}
