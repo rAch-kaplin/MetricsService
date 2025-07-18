@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/hash"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
@@ -47,7 +49,7 @@ func UpdateAllMetrics(ctx context.Context, storage *storage.MemStorage) {
 	}
 }
 
-func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.MemStorage) {
+func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.MemStorage, key string) {
 	allMetrics := storage.GetAllMetrics(ctx)
 
 	for _, metric := range allMetrics {
@@ -69,7 +71,7 @@ func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.
 			}
 
 			metricJSON.Value = &val
-			sendMetric(client, &metricJSON)
+			sendMetric(client, &metricJSON, key)
 
 		case mtr.CounterType:
 			val, ok := metric.Value().(int64)
@@ -80,12 +82,12 @@ func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.
 			}
 
 			metricJSON.Delta = &val
-			sendMetric(client, &metricJSON)
+			sendMetric(client, &metricJSON, key)
 		}
 	}
 }
 
-func sendMetric(client *resty.Client, metricJSON *serialize.Metric) {
+func sendMetric(client *resty.Client, metricJSON *serialize.Metric, key string) {
 	backoffSchedule := []time.Duration{
 		100 * time.Millisecond,
 		500 * time.Millisecond,
@@ -98,6 +100,17 @@ func sendMetric(client *resty.Client, metricJSON *serialize.Metric) {
 		return
 	}
 
+	var h string
+	if key != "" {
+		hashBytes, err := hash.GetHash([]byte(key), buf.Bytes())
+		if err != nil {
+			log.Error().Err(err).Msg("can't get hash")
+			return
+		}
+
+		h = hex.EncodeToString(hashBytes)
+	}
+
 	for _, backoff := range backoffSchedule {
 		req := client.R().
 			SetHeader("Content-Type", "application/json").
@@ -105,6 +118,10 @@ func sendMetric(client *resty.Client, metricJSON *serialize.Metric) {
 
 		if ok {
 			req.SetHeader("Content-Encoding", "gzip")
+		}
+
+		if h != "" {
+			req.SetHeader("HashSHA256", h)
 		}
 
 		res, err := req.Post("update/")

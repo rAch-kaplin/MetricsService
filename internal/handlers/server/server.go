@@ -233,7 +233,11 @@ func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 
 		value, err := storage.GetMetric(req.Context(), metric.MType, metric.ID)
 		if err != nil {
-			log.Error().Err(err).Msg("can't get valid metric")
+			log.Error().Err(err).
+				Str("type", metric.MType).
+				Str("name", metric.ID).
+				Msg("can't get valid metric")
+				
 			http.Error(resp, "can't get valid metric", http.StatusNotFound)
 			return
 		}

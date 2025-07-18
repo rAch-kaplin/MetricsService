@@ -16,6 +16,10 @@ func NewRouter(storage col.Collector, opts *config.Options) http.Handler {
 	r.Use(server.WithLogging)
 	r.Use(server.WithGzipCompress)
 
+	if opts.Key != "" {
+		r.Use(server.WithHashing([]byte(opts.Key)))
+	}
+
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", server.GetAllMetrics(storage))
 		r.Route("/update", func(r chi.Router) {

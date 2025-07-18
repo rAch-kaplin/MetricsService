@@ -12,7 +12,7 @@ import (
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	errH "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/errors-handlers"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
-	"github.com/rs/zerolog/log"
+	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
 type Database struct {
@@ -117,7 +117,7 @@ func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			log.Printf("failed to close rows: %v", err)
+			log.Error().Err(err).Msg("failed to close rows")
 		}
 	}()
 
@@ -252,7 +252,7 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 		log.Error().Err(err).Msg("failed update insert into collector")
 
 		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			log.Printf("failed to rollback transaction: %v", err)
+			log.Error().Err(err).Msg("failed to rollback transaction")
 		}
 
 		return fmt.Errorf("failed update insert into collector: %w", err)
