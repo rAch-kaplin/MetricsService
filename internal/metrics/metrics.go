@@ -11,6 +11,12 @@ type Metric interface {
 	Update(mValue any) error
 }
 
+type MetricTable struct {
+	Name  string
+	Type  string
+	Value string
+}
+
 const (
 	CounterType = "counter"
 	GaugeType   = "gauge"

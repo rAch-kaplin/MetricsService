@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/agent"
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -22,18 +22,21 @@ const (
 	defaultEndpoint       = "localhost:8080"
 	defaultPollInterval   = 2
 	defaultReportInterval = 10
+	defaultKey            = ""
 )
 
 type options struct {
 	endPointAddr   string
 	pollInterval   int
 	reportInterval int
+	key            string
 }
 
 type envConfig struct {
 	EndPointAddr   string `env:"ADDRESS"`
 	PollInterval   int    `env:"POLL_INTERVAL"`
 	ReportInterval int    `env:"REPORT_INTERVAL"`
+	Key            string `env:"KEY"`
 }
 
 var opts = &options{}
@@ -65,11 +68,17 @@ var rootCmd = &cobra.Command{
 		if cfg.EndPointAddr != "" {
 			opts.endPointAddr = cfg.EndPointAddr
 		}
+
 		if cfg.PollInterval > 0 {
 			opts.pollInterval = cfg.PollInterval
 		}
+
 		if cfg.ReportInterval > 0 {
 			opts.reportInterval = cfg.ReportInterval
+		}
+
+		if cfg.Key != "" {
+			opts.key = cfg.Key
 		}
 
 		if opts.pollInterval <= 0 || opts.reportInterval <= 0 {
@@ -86,7 +95,7 @@ var rootCmd = &cobra.Command{
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-		go func(){
+		go func() {
 			<-stop
 			cancel()
 		}()
@@ -101,20 +110,23 @@ func init() {
 	opts.endPointAddr = defaultEndpoint
 	opts.pollInterval = defaultPollInterval
 	opts.reportInterval = defaultReportInterval
+	opts.key = defaultKey
 
 	rootCmd.Flags().StringVarP(&opts.endPointAddr, "a", "a", opts.endPointAddr, "endpoint HTTP-server addr")
 	rootCmd.Flags().IntVarP(&opts.pollInterval, "p", "p", opts.pollInterval, "PollInterval value")
 	rootCmd.Flags().IntVarP(&opts.reportInterval, "r", "r", opts.reportInterval, "PollInterval value")
+	rootCmd.Flags().StringVarP(&opts.key, "k", "k", opts.key, "key for hash")
 }
 
 func startAgent(ctx context.Context) {
-	storage := ms.NewMemStorage()
+	storage := storage.NewMemStorage()
 
 	client := resty.New().
 		SetTimeout(5 * time.Second).
 		SetBaseURL("http://" + opts.endPointAddr)
 
 	log.Info().Msg("Starting collection and reporting loops")
+	log.Debug().Str("key", opts.key).Msg("")
 
 	pollTimer := time.NewTicker(time.Duration(opts.pollInterval) * time.Second)
 	reportTimer := time.NewTicker(time.Duration(opts.reportInterval) * time.Second)
@@ -128,9 +140,9 @@ func startAgent(ctx context.Context) {
 			return
 
 		case <-pollTimer.C:
-			agent.UpdateAllMetrics(storage)
+			agent.UpdateAllMetrics(ctx, storage)
 		case <-reportTimer.C:
-			agent.SendAllMetrics(client, storage)
+			agent.SendAllMetrics(ctx, client, storage, opts.key)
 		}
 	}
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/caarlos0/env/v6"
 	"github.com/spf13/cobra"
@@ -13,6 +14,8 @@ const (
 	DefaultStoreInterval   = 300
 	DefaultFileStoragePath = "/tmp/metrics-db.json"
 	DefaultRestoreOnStart  = true
+	DefaultDataBaseDSN     = ""
+	DefaultKey             = ""
 )
 
 type Options struct {
@@ -20,6 +23,8 @@ type Options struct {
 	StoreInterval   int
 	FileStoragePath string
 	RestoreOnStart  bool
+	DataBaseDSN     string
+	Key             string
 }
 
 type EnvConfig struct {
@@ -27,6 +32,8 @@ type EnvConfig struct {
 	StoreInterval   int    `env:"STORE_INTERVAL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	RestoreOnStart  bool   `env:"RESTORE"`
+	DataBaseDSN     string `env:"DATABASE_DSN"`
+	Key             string `enc:"KEY"`
 }
 
 type Option func(*Options)
@@ -37,6 +44,8 @@ func NewServerOptions(options ...Option) *Options {
 		StoreInterval:   DefaultStoreInterval,
 		FileStoragePath: DefaultFileStoragePath,
 		RestoreOnStart:  DefaultRestoreOnStart,
+		DataBaseDSN:     DefaultDataBaseDSN,
+		Key:             DefaultKey,
 	}
 
 	for _, opt := range options {
@@ -46,27 +55,39 @@ func NewServerOptions(options ...Option) *Options {
 	return opts
 }
 
-func WithAddress(addr string) func(*Options) {
+func WithAddress(addr string) Option {
 	return func(o *Options) {
 		o.EndPointAddr = addr
 	}
 }
 
-func WithStoreInterval(interval int) func(*Options) {
+func WithStoreInterval(interval int) Option {
 	return func(o *Options) {
 		o.StoreInterval = interval
 	}
 }
 
-func WithFileStoragePath(path string) func(*Options) {
+func WithFileStoragePath(path string) Option {
 	return func(o *Options) {
 		o.FileStoragePath = path
 	}
 }
 
-func WithRestoreOnStart(restore bool) func(*Options) {
+func WithRestoreOnStart(restore bool) Option {
 	return func(o *Options) {
 		o.RestoreOnStart = restore
+	}
+}
+
+func WithDataBaseDSN(dsn string) Option {
+	return func(o *Options) {
+		o.DataBaseDSN = dsn
+	}
+}
+
+func WithKey(key string) Option {
+	return func(o *Options) {
+		o.Key = key
 	}
 }
 
@@ -90,6 +111,9 @@ func ParseOptionsFromCmdAndEnvs(cmd *cobra.Command, src *Options) (*Options, err
 func ParseFlags(cmd *cobra.Command, src *Options) (*Options, error) {
 	opts := *src
 
+	if cmd.Flags().Changed("d") {
+		opts.DataBaseDSN = src.DataBaseDSN
+	}
 	if cmd.Flags().Changed("a") {
 		opts.EndPointAddr = src.EndPointAddr
 	}
@@ -109,6 +133,12 @@ func ParseFlags(cmd *cobra.Command, src *Options) (*Options, error) {
 		opts.RestoreOnStart = src.RestoreOnStart
 	}
 
+	if cmd.Flags().Changed("k") {
+		if src.Key != "" {
+			opts.Key = src.Key
+		}
+	}
+
 	return &opts, nil
 }
 
@@ -118,15 +148,27 @@ func ParseEnvs(cmd *cobra.Command, opts *Options) error {
 		return fmt.Errorf("failed to parse environment: %w", err)
 	}
 
+	if envCfg.DataBaseDSN != "" {
+		cleanDSN := strings.Trim(envCfg.DataBaseDSN, "'")
+		opts.DataBaseDSN = cleanDSN
+	}
+
 	if envCfg.EndPointAddr != "" {
 		opts.EndPointAddr = envCfg.EndPointAddr
 	}
+
 	if envCfg.StoreInterval > 0 {
 		opts.StoreInterval = envCfg.StoreInterval
 	}
+
 	if envCfg.FileStoragePath != "" {
 		opts.FileStoragePath = envCfg.FileStoragePath
 	}
+
+	if envCfg.Key != "" {
+		opts.Key = envCfg.Key
+	}
+
 	opts.RestoreOnStart = envCfg.RestoreOnStart
 
 	return nil
