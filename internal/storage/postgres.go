@@ -246,7 +246,10 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 }
 
 func (db *Database) Ping(ctx context.Context) error {
-	return fmt.Errorf("failed ping database: %w", db.DB.PingContext(ctx))
+	if err := db.DB.PingContext(ctx); err != nil {
+        return fmt.Errorf("failed ping database: %w", err)
+    }
+    return nil
 }
 
 func (db *Database) Close() error {
