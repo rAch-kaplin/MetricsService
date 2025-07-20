@@ -12,7 +12,7 @@ import (
 const (
 	DefaultEndpoint        = "localhost:8080"
 	DefaultStoreInterval   = 300
-	DefaultFileStoragePath = "/tmp/metrics-db.json"
+	DefaultFileStoragePath = ""
 	DefaultRestoreOnStart  = true
 	DefaultDataBaseDSN     = ""
 )
