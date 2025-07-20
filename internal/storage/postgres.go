@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"sync"
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
@@ -16,8 +15,7 @@ import (
 )
 
 type Database struct {
-	mutex sync.RWMutex
-	DB    *sql.DB
+	DB *sql.DB
 }
 
 func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error) {
@@ -46,12 +44,11 @@ func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error)
 	}
 
 	return &Database{
-		mutex: sync.RWMutex{},
-		DB:    db,
+		DB: db,
 	}, nil
 }
 
-func (db *Database) getMetric(ctx context.Context, mType, mName string) (any, error) {
+func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, error) {
 	var (
 		id    string
 		Type  string
@@ -95,17 +92,7 @@ func (db *Database) getMetric(ctx context.Context, mType, mName string) (any, er
 	}
 }
 
-func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, error) {
-	db.mutex.RLock()
-	defer db.mutex.RUnlock()
-
-	return db.getMetric(ctx, mType, mName)
-}
-
 func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
-	db.mutex.RLock()
-	defer db.mutex.RUnlock()
-
 	metrics := make(serialize.MetricsList, 0)
 
 	rows, err := db.DB.QueryContext(ctx,
@@ -173,10 +160,7 @@ func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
 }
 
 func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValue any) error {
-	db.mutex.Lock()
-	defer db.mutex.Unlock()
-
-	oldValue, err := db.getMetric(ctx, mType, mName)
+	oldValue, err := db.GetMetric(ctx, mType, mName)
 
 	var m mtr.Metric
 
@@ -262,13 +246,10 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 }
 
 func (db *Database) Ping(ctx context.Context) error {
-	return db.DB.PingContext(ctx)
+	return fmt.Errorf("failed ping database: %w", db.DB.PingContext(ctx))
 }
 
 func (db *Database) Close() error {
-	db.mutex.Lock()
-	defer db.mutex.Unlock()
-
 	if db.DB != nil {
 		if err := db.DB.Close(); err != nil {
 			log.Error().Err(err).Msg("failed to close database")

@@ -10,12 +10,13 @@ import (
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
-	database "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/data-base"
+	files "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/files"
 	"github.com/rs/zerolog/log"
 )
 
 type FileStorage struct {
 	mutex      sync.RWMutex
+	wg         *sync.WaitGroup
 	filePath   string
 	storage    col.Collector
 	SyncRecord bool
@@ -31,33 +32,31 @@ func (fs *FileStorage) save(ctx context.Context) {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
-	if err := database.SaveToDB(ctx, fs.storage, fs.filePath); err != nil {
+	if err := files.SaveToDB(ctx, fs.storage, fs.filePath); err != nil {
 		log.Error().Err(err).Msg("failed to save DB")
 	}
 }
 
 func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) {
 	fs := &FileStorage{
+		wg:         &sync.WaitGroup{},
 		filePath:   fp.FileStoragePath,
 		storage:    NewMemStorage(),
 		SyncRecord: fp.StoreInterval == 0,
 	}
 	if fp.RestoreOnStart {
-		fs.mutex.Lock()
-		err := database.LoadFromDB(ctx, fs.storage, fp.FileStoragePath)
-		fs.mutex.Unlock()
+		err := files.LoadFromDB(ctx, fs.storage, fp.FileStoragePath)
 
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("LoadFromDB error %w", err)
 		}
 	}
 
-	if fp.StoreInterval == 0 {
-		fs.SyncRecord = true
-	}
-
 	if fp.StoreInterval > 0 {
+		fs.wg.Add(1)
+
 		go func() {
+			defer fs.wg.Done()
 			ticker := time.NewTicker(time.Duration(fp.StoreInterval) * time.Second)
 			defer ticker.Stop()
 
@@ -72,22 +71,24 @@ func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) 
 				}
 			}
 		}()
+
+		fs.wg.Wait()
 	}
 
 	return fs, nil
 }
 
 func (fs *FileStorage) UpdateMetric(ctx context.Context, mType, mName string, mValue any) error {
-	fs.mutex.Lock()
-	defer fs.mutex.Unlock()
-
 	if err := fs.storage.UpdateMetric(ctx, mType, mName, mValue); err != nil {
 		log.Error().Err(err).Msg("failed update metric from file storage")
 		return fmt.Errorf("failed update metric from file storage %w", err)
 	}
 
 	if fs.SyncRecord {
-		if err := database.SaveToDB(ctx, fs.storage, fs.filePath); err != nil {
+		fs.mutex.Lock()
+		defer fs.mutex.Unlock()
+
+		if err := files.SaveToDB(ctx, fs.storage, fs.filePath); err != nil {
 			log.Error().Err(err).Msg("failed save storage")
 			return fmt.Errorf("failed save storage %w", err)
 		}
@@ -124,7 +125,7 @@ func (fs *FileStorage) GetAllMetrics(ctx context.Context) []mtr.Metric {
 	return fs.storage.GetAllMetrics(ctx)
 }
 
-func (fs *FileStorage) Ping(ctx context.Context) error {
+func (fs *FileStorage) Ping(_ context.Context) error {
 	return nil
 }
 

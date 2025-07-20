@@ -344,6 +344,7 @@ func UpdatesMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 func PingHandler(col col.Collector) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := col.Ping(r.Context()); err != nil {
+			log.Error().Err(err).Msg("failed ping")
 			http.Error(w, "can't ping DB", http.StatusInternalServerError)
 			return
 		}
