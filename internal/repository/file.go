@@ -98,8 +98,8 @@ func (fs *FileStorage) UpdateMetric(ctx context.Context, mType, mName string, mV
 	return nil
 }
 
-func (fs *FileStorage) GetMetric(ctx context.Context, mType, mName string) (any, error) {
-	val, err := fs.storage.GetMetric(ctx, mType, mName)
+func (fs *FileStorage) GetMetric(ctx context.Context, mType, mName string) (models.Metric, error) {
+	metric, err := fs.storage.GetMetric(ctx, mType, mName)
 	if err != nil {
 		log.Error().
 			Str("type", mType).
@@ -108,11 +108,17 @@ func (fs *FileStorage) GetMetric(ctx context.Context, mType, mName string) (any,
 		return nil, fmt.Errorf("can't get valid metric: %v", err)
 	}
 
-	return val, nil
+	return metric, nil
 }
 
-func (fs *FileStorage) GetAllMetrics(ctx context.Context) []models.Metric {
-	return fs.storage.GetAllMetrics(ctx)
+func (fs *FileStorage) GetAllMetrics(ctx context.Context) ([]models.Metric, error) {
+	metrics, err := fs.storage.GetAllMetrics(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed get all metrics")
+		return nil, fmt.Errorf("failed GetAllMetrics %v", err)
+	}
+
+	return metrics, nil
 }
 
 func (fs *FileStorage) Ping(ctx context.Context) error {

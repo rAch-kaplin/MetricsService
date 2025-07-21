@@ -106,13 +106,13 @@ func TestMemStorage_UpdateMetric(t *testing.T) {
 			}
 
 			if !tt.wantErr {
-				val, err := ms.GetMetric(ctx, tt.args.mType, tt.args.mName)
+				metric, err := ms.GetMetric(ctx, tt.args.mType, tt.args.mName)
 				if err != nil {
 					t.Errorf("metric not found")
 					return
 				}
-				if val != tt.wantResult {
-					t.Errorf("got = %v, want = %v", val, tt.wantResult)
+				if metric.Value() != tt.wantResult {
+					t.Errorf("got = %v, want = %v", metric.Value(), tt.wantResult)
 				}
 			}
 		})
@@ -179,90 +179,110 @@ func TestMemStorage_GetMetric(t *testing.T) {
 				mutex:   sync.RWMutex{},
 				storage: tt.fields,
 			}
-			gotVal, err := ms.GetMetric(ctx, tt.mType, tt.mName)
+			metric, err := ms.GetMetric(ctx, tt.mType, tt.mName)
 
 			if (err == nil) != tt.wantOk {
 				t.Errorf("GetMetric() error = %v, wantOk = %v", err, tt.wantOk)
 				return
 			}
 
-			if tt.wantOk && gotVal != tt.wantVal {
-				t.Errorf("GetMetric() gotVal = %v, want %v", gotVal, tt.wantVal)
+			if tt.wantOk && metric.Value() != tt.wantVal {
+				t.Errorf("GetMetric() gotVal = %v, want %v", metric.Value(), tt.wantVal)
 			}
 		})
 	}
 }
 
-// func TestMemStorage_GetAllMetrics(t *testing.T) {
-// 	counter := mtr.NewCounter("requests", 100)
-// 	gauge := mtr.NewGauge("temperature", 25.5)
-// 	type fields struct {
-// 		mutex   sync.RWMutex
-// 		storage map[string]map[string]mtr.Metric
-// 	}
-// 	tests := []struct {
-// 		name   string
-// 		fields fields
-// 		want   map[string]map[string]mtr.Metric
-// 	}{
-// 		{
-// 			name: "empty storage",
-// 			fields: fields{
-// 				mutex:   sync.RWMutex{},
-// 				storage: map[string]map[string]mtr.Metric{},
-// 			},
-// 			want: map[string]map[string]mtr.Metric{},
-// 		},
-// 		{
-// 			name: "storage with one counter",
-// 			fields: fields{
-// 				mutex: sync.RWMutex{},
-// 				storage: map[string]map[string]mtr.Metric{
-// 					mtr.CounterType: {
-// 						"requests": counter,
-// 					},
-// 				},
-// 			},
-// 			want: map[string]map[string]mtr.Metric{
-// 				mtr.CounterType: {
-// 					"requests": counter,
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "storage with gauge and counter",
-// 			fields: fields{
-// 				mutex: sync.RWMutex{},
-// 				storage: map[string]map[string]mtr.Metric{
-// 					mtr.CounterType: {
-// 						"requests": counter,
-// 					},
-// 					mtr.GaugeType: {
-// 						"temperature": gauge,
-// 					},
-// 				},
-// 			},
-// 			want: map[string]map[string]mtr.Metric{
-// 				mtr.CounterType: {
-// 					"requests": counter,
-// 				},
-// 				mtr.GaugeType: {
-// 					"temperature": gauge,
-// 				},
-// 			},
-// 		},
-// 	}
-//
-// 	for i := range tests {
-// 		tt := &tests[i]
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			ms := &MemStorage{
-// 				mutex:   sync.RWMutex{},
-// 				storage: tt.fields.storage,
-// 			}
-// 			if got := ms.GetAllMetrics(); !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("MemStorage.GetAllMetrics() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
+func TestMemStorage_GetAllMetrics(t *testing.T) {
+	ctx := context.Background()
+
+	counter := models.NewCounter("requests", 100)
+	gauge := models.NewGauge("temperature", 25.5)
+
+	tests := []struct {
+		name    string
+		storage map[string]map[string]models.Metric
+		want    map[string]models.Metric
+	}{
+		{
+			name:    "empty storage",
+			storage: map[string]map[string]models.Metric{},
+			want:    map[string]models.Metric{},
+		},
+		{
+			name: "storage with one counter",
+			storage: map[string]map[string]models.Metric{
+				models.CounterType: {
+					"requests": counter,
+				},
+			},
+			want: map[string]models.Metric{
+				"requests": counter,
+			},
+		},
+		{
+			name: "storage with gauge and counter",
+			storage: map[string]map[string]models.Metric{
+				models.CounterType: {
+					"requests": counter,
+				},
+				models.GaugeType: {
+					"temperature": gauge,
+				},
+			},
+			want: map[string]models.Metric{
+				"requests":    counter,
+				"temperature": gauge,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ms := &MemStorage{
+				mutex:   sync.RWMutex{},
+				storage: tt.storage,
+			}
+
+			got, err := ms.GetAllMetrics(ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			gotMap := make(map[string]models.Metric)
+			for _, m := range got {
+				gotMap[m.Name()] = m
+			}
+
+			if len(gotMap) != len(tt.want) {
+				t.Errorf("wrong number of metrics: got %d, want %d", len(gotMap), len(tt.want))
+			}
+
+			for name, wantMetric := range tt.want {
+				gotMetric, ok := gotMap[name]
+				if !ok {
+					t.Errorf("missing metric: %s", name)
+					continue
+				}
+
+				if gotMetric.Type() != wantMetric.Type() {
+					t.Errorf("metric %s type mismatch: got %s, want %s", name, gotMetric.Type(), wantMetric.Type())
+				}
+
+				switch wantMetric.Type() {
+				case models.CounterType:
+					if gotMetric.Value() == nil {
+						t.Errorf("metric %s: expected counter delta, got nil", name)
+					}
+				case models.GaugeType:
+					if gotMetric.Value() == nil {
+						t.Errorf("metric %s: expected gauge value, got nil", name)
+					}
+				default:
+					t.Errorf("metric %s: unknown type %s", name, wantMetric.Type())
+				}
+			}
+		})
+	}
+}
+

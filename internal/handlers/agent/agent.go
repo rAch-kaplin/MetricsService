@@ -49,7 +49,10 @@ func UpdateAllMetrics(ctx context.Context, storage col.Collector) {
 }
 
 func SendAllMetrics(ctx context.Context, client *resty.Client, storage *repo.MemStorage) {
-	allMetrics := storage.GetAllMetrics(ctx)
+	allMetrics, err := storage.GetAllMetrics(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to Get metrics")
+	}
 
 	for _, metric := range allMetrics {
 		mType := metric.Type()

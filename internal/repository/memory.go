@@ -54,7 +54,7 @@ func (ms *MemStorage) UpdateMetric(_ context.Context, mType, mName string, mValu
 	return nil
 }
 
-func (ms *MemStorage) GetMetric(_ context.Context, mType, mName string) (any, error) {
+func (ms *MemStorage) GetMetric(_ context.Context, mType, mName string) (models.Metric, error) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
@@ -63,10 +63,10 @@ func (ms *MemStorage) GetMetric(_ context.Context, mType, mName string) (any, er
 		return nil, models.ErrMetricsNotFound
 	}
 
-	return metric.Value(), nil
+	return metric, nil
 }
 
-func (ms *MemStorage) GetAllMetrics(_ context.Context) []models.Metric {
+func (ms *MemStorage) GetAllMetrics(_ context.Context) ([]models.Metric, error) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
@@ -82,7 +82,7 @@ func (ms *MemStorage) GetAllMetrics(_ context.Context) []models.Metric {
 		}
 	}
 
-	return result
+	return result, nil
 }
 
 func (ms *MemStorage) Ping(ctx context.Context) error {

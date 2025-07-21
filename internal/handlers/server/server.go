@@ -2,7 +2,6 @@ package server
 
 import (
 	"compress/gzip"
-	"context"
 	"fmt"
 	"html/template"
 	"io"
@@ -36,14 +35,14 @@ func (srv *Server) GetMetric() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
-		value, err := srv.Storage.GetMetric(req.Context(), mType, mName)
+		metric, err := srv.Storage.GetMetric(req.Context(), mType, mName)
 		if err != nil {
 			http.Error(res, fmt.Sprintf("Metric %s was not found", mName), http.StatusNotFound)
 			return
 		}
 
 		var valueStr string
-		switch v := value.(type) {
+		switch v := metric.Value().(type) {
 		case float64:
 			valueStr = strconv.FormatFloat(v, 'f', -1, 64)
 		case int64:
@@ -66,7 +65,10 @@ func (srv *Server) GetMetric() http.HandlerFunc {
 
 func (srv *Server) GetAllMetrics() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		allMetrics := srv.Storage.GetAllMetrics(req.Context())
+		allMetrics, err := srv.Storage.GetAllMetrics(req.Context())
+		if err != nil {
+			log.Error().Err(err).Msg("failed to Get metrics")
+		}
 
 		var metricsToTable []models.MetricTable
 
@@ -187,32 +189,9 @@ func (srv *Server) UpdateMetric() http.HandlerFunc {
 	}
 }
 
-func FillMetricValueFromStorage(ctx context.Context, storage col.Collector, metric *serialize.Metric) bool {
-	value, err := storage.GetMetric(ctx, metric.MType, metric.ID)
-	if err != nil {
-		return false
-	}
-
-	switch v := value.(type) {
-	case float64:
-		metric.Value = &v
-	case int64:
-		metric.Delta = &v
-	default:
-		log.Error().
-			Str("metricType", metric.MType).
-			Str("metricName", metric.ID).
-			Msg("unsupported metric type")
-
-		return false
-	}
-
-	return true
-}
-
 func (srv *Server) GetMetricsHandlerJSON() http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
-		var metric serialize.Metric
+		var jsonMetric serialize.Metric
 
 		log.Info().Msg("GetMetricsHandlerJSON called")
 		if req.Header.Get("Content-Type") != "application/json" {
@@ -220,26 +199,27 @@ func (srv *Server) GetMetricsHandlerJSON() http.HandlerFunc {
 			return
 		}
 
-		if err := easyjson.UnmarshalFromReader(req.Body, &metric); err != nil {
+		if err := easyjson.UnmarshalFromReader(req.Body, &jsonMetric); err != nil {
 			http.Error(resp, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
 			return
 		}
 
-		value, err := srv.Storage.GetMetric(req.Context(), metric.MType, metric.ID)
+		log.Debug().Str("type", jsonMetric.MType).Str("name", jsonMetric.ID).Msg("")
+		metric, err := srv.Storage.GetMetric(req.Context(), jsonMetric.MType, jsonMetric.ID)
 		if err != nil {
 			log.Error().Err(err).Msg("can't get valid metric")
 			http.Error(resp, "can't get valid metric", http.StatusNotFound)
 			return
 		}
 
-		if err := metric.SetValue(value); err != nil {
+		if err := jsonMetric.SetValue(metric.Value()); err != nil {
 			log.Error().Err(err).Msg("can't set new value")
 			http.Error(resp, "can't set new value", http.StatusInternalServerError)
 			return
 		}
 
 		resp.Header().Set("Content-Type", "application/json")
-		if _, err := easyjson.MarshalToWriter(&metric, resp); err != nil {
+		if _, err := easyjson.MarshalToWriter(&jsonMetric, resp); err != nil {
 			http.Error(resp, fmt.Sprintf("failed to encode json: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -266,7 +246,7 @@ func (srv *Server) UpdateMetricsHandlerJSON() http.HandlerFunc {
 			reader = req.Body
 		}
 
-		var metric serialize.Metric
+		var jsonMetric serialize.Metric
 
 		log.Info().Msg("UpdateMetricsHandlerJSON called")
 		if req.Header.Get("Content-Type") != "application/json" {
@@ -274,29 +254,38 @@ func (srv *Server) UpdateMetricsHandlerJSON() http.HandlerFunc {
 			return
 		}
 
-		if err := easyjson.UnmarshalFromReader(reader, &metric); err != nil {
+		if err := easyjson.UnmarshalFromReader(reader, &jsonMetric); err != nil {
 			http.Error(resp, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
 			return
 		}
 
-		value, err := metric.GetValue()
+		value, err := jsonMetric.GetValue()
 		if err != nil {
 			log.Error().Err(err).Msg("can't get value")
 			http.Error(resp, "can't get value", http.StatusBadRequest)
 			return
 		}
 
-		if err := srv.Storage.UpdateMetric(req.Context(), metric.MType, metric.ID, value); err != nil {
-			http.Error(resp, fmt.Sprintf("invalid update metric %s: %v", metric.ID, err), http.StatusBadRequest)
+		if err := srv.Storage.UpdateMetric(req.Context(), jsonMetric.MType, jsonMetric.ID, value); err != nil {
+			http.Error(resp, fmt.Sprintf("invalid update metric %s: %v", jsonMetric.ID, err), http.StatusBadRequest)
+			return
 		}
 
-		if !FillMetricValueFromStorage(req.Context(), srv.Storage, &metric) {
-			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
+		newMetric, err := srv.Storage.GetMetric(req.Context(), jsonMetric.MType, jsonMetric.ID)
+		if err != nil {
+			log.Error().Err(err).Msg("can't get new value metric")
+			http.Error(resp, "can't get new value metric", http.StatusNotFound)
+			return
+		}
+
+		err = jsonMetric.SetValue(newMetric.Value())
+		if err != nil {
+			http.Error(resp, fmt.Sprintf("metric %s not found", jsonMetric.ID), http.StatusNotFound)
 			return
 		}
 
 		resp.Header().Set("Content-Type", "application/json")
-		if _, err := easyjson.MarshalToWriter(&metric, resp); err != nil {
+		if _, err := easyjson.MarshalToWriter(&jsonMetric, resp); err != nil {
 			http.Error(resp, fmt.Sprintf("failed to encode json: %v", err), http.StatusInternalServerError)
 			return
 		}

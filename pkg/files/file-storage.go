@@ -14,7 +14,11 @@ import (
 )
 
 func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
-	allMetrics := collector.GetAllMetrics(ctx)
+	allMetrics, err := collector.GetAllMetrics(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to Get metrics")
+	}
+
 	data := make(serialize.MetricsList, 0, len(allMetrics))
 
 	for _, metric := range allMetrics {

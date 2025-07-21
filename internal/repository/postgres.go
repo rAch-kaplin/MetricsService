@@ -8,9 +8,7 @@ import (
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	errH "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/errors-handlers"
-	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	"github.com/rs/zerolog/log"
 )
 
@@ -48,7 +46,7 @@ func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error)
 	}, nil
 }
 
-func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, error) {
+func (db *Database) GetMetric(ctx context.Context, mType, mName string) (models.Metric, error) {
 	var (
 		id    string
 		Type  string
@@ -72,59 +70,37 @@ func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, er
 		return nil, fmt.Errorf("row.Scan can't read: %w", err)
 	}
 
+	if Type != mType {
+        return nil, models.ErrInvalidMetricsType
+    }
+	
 	switch {
 	case value.Valid:
 		if Type != models.GaugeType {
 			return nil, models.ErrInvalidMetricsType
 		}
 
-		return value.Float64, nil
+		return models.NewGauge(mName, value.Float64), nil
 
 	case delta.Valid:
 		if Type != models.CounterType {
 			return nil, models.ErrInvalidMetricsType
 		}
 
-		return delta.Int64, nil
+		return models.NewCounter(mName, delta.Int64), nil
 	default:
 		log.Error().Msg("not valid value")
 		return nil, models.ErrInvalidValueType
 	}
 }
 
-func fillMetricValues(metric *serialize.Metric, delta sql.NullInt64, value sql.NullFloat64) error {
-	switch {
-	case value.Valid:
-		if metric.MType != models.GaugeType {
-			return models.ErrInvalidMetricsType
-		}
-
-		metric.Value = &value.Float64
-
-	case delta.Valid:
-		if metric.MType != models.CounterType {
-			return models.ErrInvalidMetricsType
-		}
-
-		metric.Delta = &delta.Int64
-
-	default:
-		log.Error().Msg("not valid value")
-		return nil
-	}
-
-	return nil
-}
-
-func (db *Database) GetAllMetrics(ctx context.Context) []models.Metric {
-	metrics := make(serialize.MetricsList, 0)
-
+func (db *Database) GetAllMetrics(ctx context.Context) ([]models.Metric, error) {
 	rows, err := db.DB.QueryContext(ctx,
 		"SELECT ID, MType, Delta, Value FROM collector")
 
 	if err != nil {
 		log.Error().Err(err).Msg("The request was not processed")
-		return nil
+		return nil, fmt.Errorf("failed to query all metrics: %v", err)
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -132,124 +108,86 @@ func (db *Database) GetAllMetrics(ctx context.Context) []models.Metric {
 		}
 	}()
 
+	metrics := make([]models.Metric, 0)
+
 	var (
+		id    string
+		mType string
 		delta sql.NullInt64
 		value sql.NullFloat64
 	)
 
 	for rows.Next() {
-		var metric serialize.Metric
-
-		err = rows.Scan(&metric.ID, &metric.MType, &delta, &value)
+		err = rows.Scan(&id, &mType, &delta, &value)
 		if err != nil {
-			log.Error().Err(err).Msgf("failed scan row: ID = %s, MType = %s",
-				metric.ID, metric.MType)
-			return nil
+			log.Error().Err(err).Msgf("failed scan row: ID = %s, MType = %s", id, mType)
+			return nil, fmt.Errorf("failed to scan metric row: %v", err)
 		}
 
-		if err := fillMetricValues(&metric, delta, value); err != nil {
-			log.Error().Err(err).Msg("can't set values")
-			return nil
+		switch mType {
+		case models.GaugeType:
+			if value.Valid {
+				metrics = append(metrics, models.NewGauge(id, value.Float64))
+			}
+
+		case models.CounterType:
+			if delta.Valid {
+				metrics = append(metrics, models.NewCounter(id, delta.Int64))
+			}
+
+		default:
+			return nil, fmt.Errorf("incorrectly metric type %v", models.ErrInvalidMetricsType)
 		}
 
-		metrics = append(metrics, metric)
 	}
 
-	if rows.Err() != nil {
-		log.Error().Err(rows.Err()).Msg("have rows error")
-		return nil
-	}
-
-	convertedMetrics, err := converter.ConvertMetrics(metrics)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to convert metrics")
-		return nil
-	}
-
-	return convertedMetrics
+	return metrics, nil
 }
 
 func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValue any) error {
-	oldValue, err := db.GetMetric(ctx, mType, mName)
+	var delta *int64
+	var value *float64
 
-	var m models.Metric
-
-	switch newVal := mValue.(type) {
+	switch v := mValue.(type) {
 	case float64:
 		if mType != models.GaugeType {
-			return models.ErrInvalidMetricsType
+			return fmt.Errorf("metric type mismatch: got float64 with type %q", mType)
 		}
-		m = models.NewGauge(mName, newVal)
+		value = &v
 
 	case int64:
 		if mType != models.CounterType {
-			return models.ErrInvalidMetricsType
+			return fmt.Errorf("metric type mismatch: got int64 with type %q", mType)
 		}
-		if errors.Is(err, models.ErrMetricsNotFound) {
-			m = models.NewCounter(mName, newVal)
-		} else {
-			m = models.NewCounter(mName, oldValue.(int64))
-			if err := m.Update(newVal); err != nil {
-				return fmt.Errorf("failed update metric %v", err)
-			}
-		}
+		delta = &v
 
 	default:
-		return fmt.Errorf("unsupported metric type %T", mValue)
-	}
-
-	metric := serialize.Metric{
-		ID:    mName,
-		MType: mType,
-	}
-	//TODO - make method maybe for Metrics type
-	switch metric.MType {
-	case models.GaugeType:
-		val, ok := m.Value().(float64)
-		if !ok {
-			return fmt.Errorf("expected float64 for gauge, got %T", m.Value())
-		}
-		metric.Value = &val
-
-	case models.CounterType:
-		val, ok := m.Value().(int64)
-		if !ok {
-			return fmt.Errorf("expected int64 for counter, got %T", m.Value())
-		}
-		metric.Delta = &val
-
-	default:
-		return fmt.Errorf("unknown metric type: %s", metric.MType)
+		return fmt.Errorf("unsupported metric value type: %T", v)
 	}
 
 	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("failed begin transaction")
+		return fmt.Errorf("begin transaction: %w", err)
 	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
-	execContext := func() error {
-		_, err = tx.ExecContext(ctx,
-			`INSERT INTO collector ("ID", "MType", "Delta", "Value")
-		 VALUES ($1, $2, $3, $4)
-		 ON CONFLICT ("ID") DO UPDATE
-		 SET "Delta" = EXCLUDED."Delta",
-		     "Value" = EXCLUDED."Value",
-		     "MType" = EXCLUDED."MType";`,
-			metric.ID, metric.MType, metric.Delta, metric.Value)
-
+	exec := func() error {
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO collector ("ID", "MType", "Delta", "Value")
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT ("ID") DO UPDATE
+			SET "Delta" = collector."Delta" + EXCLUDED."Delta",
+				"Value" = EXCLUDED."Value",
+				"MType" = EXCLUDED."MType"`,
+			mName, mType, delta, value)
 		return err
 	}
 
-	err = errH.WithRetry(execContext, errH.IsPostgresRetriableError)
-
-	if err != nil {
-		log.Error().Err(err).Msg("failed update insert into collector")
-
-		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			log.Printf("failed to rollback transaction: %v", err)
-		}
-
-		return fmt.Errorf("failed update insert into collector: %w", err)
+	if err := errH.WithRetry(exec, errH.IsPostgresRetriableError); err != nil {
+		log.Error().Err(err).Msg("failed to insert/update metric")
+		return fmt.Errorf("update metric: %w", err)
 	}
 
 	return tx.Commit()
