@@ -1,4 +1,4 @@
-package metrics
+package models
 
 type counter struct {
 	name  string

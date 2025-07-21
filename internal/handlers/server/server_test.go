@@ -12,9 +12,9 @@ import (
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
-	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
+	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -41,7 +41,7 @@ func TestUpdateMetric(t *testing.T) {
 		}
 	}()
 
-	storage := storage.NewMemStorage()
+	storage := repo.NewMemStorage()
 	router := router.NewRouter(server.NewServer(storage, opts))
 
 	tests := []struct {
@@ -133,13 +133,13 @@ func TestGetMetric(t *testing.T) {
 
 	//FIXME - maybe need mocks
 	ctx := context.Background()
-	storage := storage.NewMemStorage()
+	storage := repo.NewMemStorage()
 
-	if err := storage.UpdateMetric(ctx, mtr.GaugeType, "cpu_usage", 75.5); err != nil {
+	if err := storage.UpdateMetric(ctx, models.GaugeType, "cpu_usage", 75.5); err != nil {
 		log.Error().Msgf("Failed to update metric cpu_usage: %v", err)
 	}
 
-	if err := storage.UpdateMetric(ctx, mtr.CounterType, "requests_total", int64(100)); err != nil {
+	if err := storage.UpdateMetric(ctx, models.CounterType, "requests_total", int64(100)); err != nil {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 

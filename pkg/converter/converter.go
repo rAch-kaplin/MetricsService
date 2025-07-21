@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"strconv"
 
-	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	"github.com/rs/zerolog/log"
 )
 
 func ConvertByType(mType, mValue string) (any, error) {
 	switch mType {
-	case mtr.GaugeType:
+	case models.GaugeType:
 		if val, err := strconv.ParseFloat(mValue, 64); err != nil {
 			return nil, fmt.Errorf("convert gauge value %s: %w", mValue, err)
 		} else {
 			return val, nil
 		}
-	case mtr.CounterType:
+	case models.CounterType:
 		if val, err := strconv.ParseInt(mValue, 10, 64); err != nil {
 			return nil, fmt.Errorf("convert counter value %s: %w", mValue, err)
 		} else {
@@ -28,8 +28,8 @@ func ConvertByType(mType, mValue string) (any, error) {
 	}
 }
 
-func ConvertMetrics(src serialize.MetricsList) ([]mtr.Metric, error) {
-	converted := make([]mtr.Metric, 0, len(src))
+func ConvertMetrics(src serialize.MetricsList) ([]models.Metric, error) {
+	converted := make([]models.Metric, 0, len(src))
 
 	for _, m := range src {
 		metric, err := ConvertMetric(m)
@@ -44,21 +44,21 @@ func ConvertMetrics(src serialize.MetricsList) ([]mtr.Metric, error) {
 	return converted, nil
 }
 
-func ConvertMetric(src serialize.Metric) (mtr.Metric, error) {
-	var converted mtr.Metric
+func ConvertMetric(src serialize.Metric) (models.Metric, error) {
+	var converted models.Metric
 
 	switch src.MType {
-	case mtr.GaugeType:
+	case models.GaugeType:
 		if src.Value == nil {
 			return nil, fmt.Errorf("nil gauge value for ID: %s", src.ID)
 		}
-		converted = mtr.NewGauge(src.ID, *src.Value)
+		converted = models.NewGauge(src.ID, *src.Value)
 
-	case mtr.CounterType:
+	case models.CounterType:
 		if src.Delta == nil {
 			return nil, fmt.Errorf("nil counter value for ID: %s", src.ID)
 		}
-		converted = mtr.NewCounter(src.ID, *src.Delta)
+		converted = models.NewCounter(src.ID, *src.Delta)
 	default:
 		return nil, fmt.Errorf("unsupported metric type: %s", src.MType)
 	}

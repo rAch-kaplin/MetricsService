@@ -1,20 +1,20 @@
-package storage
+package repository
 
 import (
 	"context"
 	"sync"
 
-	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 )
 
 type MemStorage struct {
 	mutex   sync.RWMutex
-	storage map[string]map[string]mtr.Metric
+	storage map[string]map[string]models.Metric
 }
 
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		storage: make(map[string]map[string]mtr.Metric),
+		storage: make(map[string]map[string]models.Metric),
 	}
 }
 
@@ -23,30 +23,30 @@ func (ms *MemStorage) UpdateMetric(_ context.Context, mType, mName string, mValu
 	defer ms.mutex.Unlock()
 
 	if _, ok := ms.storage[mType]; !ok {
-		ms.storage[mType] = make(map[string]mtr.Metric)
+		ms.storage[mType] = make(map[string]models.Metric)
 	}
 
 	if oldMetric, ok := ms.storage[mType][mName]; ok {
 		return oldMetric.Update(mValue)
 	}
 
-	var newMetric mtr.Metric
+	var newMetric models.Metric
 
 	switch mType {
-	case mtr.GaugeType:
+	case models.GaugeType:
 		value, ok := mValue.(float64)
 		if !ok {
-			return mtr.ErrInvalidValueType
+			return models.ErrInvalidValueType
 		}
-		newMetric = mtr.NewGauge(mName, value)
-	case mtr.CounterType:
+		newMetric = models.NewGauge(mName, value)
+	case models.CounterType:
 		value, ok := mValue.(int64)
 		if !ok {
-			return mtr.ErrInvalidValueType
+			return models.ErrInvalidValueType
 		}
-		newMetric = mtr.NewCounter(mName, value)
+		newMetric = models.NewCounter(mName, value)
 	default:
-		return mtr.ErrInvalidMetricsType
+		return models.ErrInvalidMetricsType
 	}
 
 	ms.storage[mType][mName] = newMetric
@@ -60,13 +60,13 @@ func (ms *MemStorage) GetMetric(_ context.Context, mType, mName string) (any, er
 
 	metric, ok := ms.storage[mType][mName]
 	if !ok {
-		return nil, mtr.ErrMetricsNotFound
+		return nil, models.ErrMetricsNotFound
 	}
 
 	return metric.Value(), nil
 }
 
-func (ms *MemStorage) GetAllMetrics(_ context.Context) []mtr.Metric {
+func (ms *MemStorage) GetAllMetrics(_ context.Context) []models.Metric {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
@@ -74,7 +74,7 @@ func (ms *MemStorage) GetAllMetrics(_ context.Context) []mtr.Metric {
 	for _, innerMap := range ms.storage {
 		total += len(innerMap)
 	}
-	result := make([]mtr.Metric, 0, total)
+	result := make([]models.Metric, 0, total)
 
 	for _, innerMap := range ms.storage {
 		for _, metric := range innerMap {

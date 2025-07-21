@@ -14,8 +14,8 @@ import (
 	"github.com/mailru/easyjson"
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
-	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
@@ -39,16 +39,16 @@ func UpdateAllMetrics(ctx context.Context, storage col.Collector) {
 		log.Debug().Msgf("update metric %s", stat.Name)
 	}
 
-	if err := storage.UpdateMetric(ctx, mtr.CounterType, "PollCount", int64(1)); err != nil {
+	if err := storage.UpdateMetric(ctx, models.CounterType, "PollCount", int64(1)); err != nil {
 		log.Error().Msgf("Failed to update PollCount metric: %v", err)
 	}
 
-	if err := storage.UpdateMetric(ctx, mtr.GaugeType, "RandomValue", rand.Float64()); err != nil {
+	if err := storage.UpdateMetric(ctx, models.GaugeType, "RandomValue", rand.Float64()); err != nil {
 		log.Error().Msgf("Failed to update RandomValue metric: %v", err)
 	}
 }
 
-func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.MemStorage) {
+func SendAllMetrics(ctx context.Context, client *resty.Client, storage *repo.MemStorage) {
 	allMetrics := storage.GetAllMetrics(ctx)
 
 	for _, metric := range allMetrics {
@@ -61,7 +61,7 @@ func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.
 		}
 
 		switch mType {
-		case mtr.GaugeType:
+		case models.GaugeType:
 			val, ok := metric.Value().(float64)
 			if !ok {
 				log.Error().Str("metric_name", mName).Str("metric_type", mType).
@@ -72,7 +72,7 @@ func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.
 			metricJSON.Value = &val
 			sendMetric(client, &metricJSON)
 
-		case mtr.CounterType:
+		case models.CounterType:
 			val, ok := metric.Value().(int64)
 			if !ok {
 				log.Error().Str("metric_name", mName).Str("metric_type", mType).

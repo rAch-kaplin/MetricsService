@@ -1,4 +1,4 @@
-package database
+package files
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
-	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
@@ -23,13 +23,13 @@ func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
 		newMetric.ID = metric.Name()
 
 		switch metric.Type() {
-		case mtr.GaugeType:
+		case models.GaugeType:
 			val, ok := metric.Value().(float64)
 			if !ok {
 				return fmt.Errorf("invalid gauge metric value")
 			}
 			newMetric.Value = &val
-		case mtr.CounterType:
+		case models.CounterType:
 			val, ok := metric.Value().(int64)
 			if !ok {
 				return fmt.Errorf("invalid counter metric value")
@@ -109,12 +109,12 @@ func LoadFromDB(ctx context.Context, collector col.Collector, path string) error
 
 	for _, metric := range data {
 		switch metric.MType {
-		case mtr.GaugeType:
+		case models.GaugeType:
 			if err := collector.UpdateMetric(ctx, metric.MType, metric.ID, *metric.Value); err != nil {
 				log.Error().Err(err).Msg("update metric error")
 				return fmt.Errorf("update metric error %w", err)
 			}
-		case mtr.CounterType:
+		case models.CounterType:
 			if err := collector.UpdateMetric(ctx, metric.MType, metric.ID, *metric.Delta); err != nil {
 				log.Error().Err(err).Msg("update metric error")
 				return fmt.Errorf("update metric error %w", err)

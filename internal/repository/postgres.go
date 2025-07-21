@@ -1,4 +1,4 @@
-package storage
+package repository
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
-	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	errH "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/errors-handlers"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
@@ -67,43 +67,43 @@ func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, er
 	err := errH.WithRetry(getMtr, errH.IsPostgresRetriableError)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, mtr.ErrMetricsNotFound
+		return nil, models.ErrMetricsNotFound
 	} else if err != nil {
 		return nil, fmt.Errorf("row.Scan can't read: %w", err)
 	}
 
 	switch {
 	case value.Valid:
-		if Type != mtr.GaugeType {
-			return nil, mtr.ErrInvalidMetricsType
+		if Type != models.GaugeType {
+			return nil, models.ErrInvalidMetricsType
 		}
 
 		return value.Float64, nil
 
 	case delta.Valid:
-		if Type != mtr.CounterType {
-			return nil, mtr.ErrInvalidMetricsType
+		if Type != models.CounterType {
+			return nil, models.ErrInvalidMetricsType
 		}
 
 		return delta.Int64, nil
 	default:
 		log.Error().Msg("not valid value")
-		return nil, mtr.ErrInvalidValueType
+		return nil, models.ErrInvalidValueType
 	}
 }
 
 func fillMetricValues(metric *serialize.Metric, delta sql.NullInt64, value sql.NullFloat64) error {
 	switch {
 	case value.Valid:
-		if metric.MType != mtr.GaugeType {
-			return mtr.ErrInvalidMetricsType
+		if metric.MType != models.GaugeType {
+			return models.ErrInvalidMetricsType
 		}
 
 		metric.Value = &value.Float64
 
 	case delta.Valid:
-		if metric.MType != mtr.CounterType {
-			return mtr.ErrInvalidMetricsType
+		if metric.MType != models.CounterType {
+			return models.ErrInvalidMetricsType
 		}
 
 		metric.Delta = &delta.Int64
@@ -116,7 +116,7 @@ func fillMetricValues(metric *serialize.Metric, delta sql.NullInt64, value sql.N
 	return nil
 }
 
-func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
+func (db *Database) GetAllMetrics(ctx context.Context) []models.Metric {
 	metrics := make(serialize.MetricsList, 0)
 
 	rows, err := db.DB.QueryContext(ctx,
@@ -172,23 +172,23 @@ func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
 func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValue any) error {
 	oldValue, err := db.GetMetric(ctx, mType, mName)
 
-	var m mtr.Metric
+	var m models.Metric
 
 	switch newVal := mValue.(type) {
 	case float64:
-		if mType != mtr.GaugeType {
-			return mtr.ErrInvalidMetricsType
+		if mType != models.GaugeType {
+			return models.ErrInvalidMetricsType
 		}
-		m = mtr.NewGauge(mName, newVal)
+		m = models.NewGauge(mName, newVal)
 
 	case int64:
-		if mType != mtr.CounterType {
-			return mtr.ErrInvalidMetricsType
+		if mType != models.CounterType {
+			return models.ErrInvalidMetricsType
 		}
-		if errors.Is(err, mtr.ErrMetricsNotFound) {
-			m = mtr.NewCounter(mName, newVal)
+		if errors.Is(err, models.ErrMetricsNotFound) {
+			m = models.NewCounter(mName, newVal)
 		} else {
-			m = mtr.NewCounter(mName, oldValue.(int64))
+			m = models.NewCounter(mName, oldValue.(int64))
 			if err := m.Update(newVal); err != nil {
 				return fmt.Errorf("failed update metric %v", err)
 			}
@@ -204,14 +204,14 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 	}
 	//TODO - make method maybe for Metrics type
 	switch metric.MType {
-	case mtr.GaugeType:
+	case models.GaugeType:
 		val, ok := m.Value().(float64)
 		if !ok {
 			return fmt.Errorf("expected float64 for gauge, got %T", m.Value())
 		}
 		metric.Value = &val
 
-	case mtr.CounterType:
+	case models.CounterType:
 		val, ok := m.Value().(int64)
 		if !ok {
 			return fmt.Errorf("expected int64 for counter, got %T", m.Value())

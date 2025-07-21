@@ -1,4 +1,4 @@
-package metrics
+package models
 
 type gauge struct {
 	name  string

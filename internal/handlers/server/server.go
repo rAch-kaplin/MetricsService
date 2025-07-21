@@ -14,7 +14,7 @@ import (
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
-	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	models "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
@@ -68,7 +68,7 @@ func (srv *Server) GetAllMetrics() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		allMetrics := srv.Storage.GetAllMetrics(req.Context())
 
-		var metricsToTable []mtr.MetricTable
+		var metricsToTable []models.MetricTable
 
 		for _, metric := range allMetrics {
 			var valStr string
@@ -76,7 +76,7 @@ func (srv *Server) GetAllMetrics() http.HandlerFunc {
 			mType := metric.Type()
 
 			switch mType {
-			case mtr.GaugeType:
+			case models.GaugeType:
 				val, ok := metric.Value().(float64)
 				if !ok {
 					log.Error().Str("metric_name", mName).Str("metric_type", mType).
@@ -85,7 +85,7 @@ func (srv *Server) GetAllMetrics() http.HandlerFunc {
 				}
 				valStr = strconv.FormatFloat(val, 'f', -1, 64)
 
-			case mtr.CounterType:
+			case models.CounterType:
 				val, ok := metric.Value().(int64)
 				if !ok {
 					log.Error().Str("metric_name", mName).Str("metric_type", mType).
@@ -95,7 +95,7 @@ func (srv *Server) GetAllMetrics() http.HandlerFunc {
 				valStr = strconv.FormatInt(val, 10)
 			}
 
-			metricsToTable = append(metricsToTable, mtr.MetricTable{
+			metricsToTable = append(metricsToTable, models.MetricTable{
 				Name:  mName,
 				Type:  mType,
 				Value: valStr,

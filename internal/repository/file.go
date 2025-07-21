@@ -1,4 +1,4 @@
-package storage
+package repository
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	"time"
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
-	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
-	database "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/files"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/files"
 	"github.com/rs/zerolog/log"
 )
 
@@ -32,7 +32,7 @@ func (fs *FileStorage) save(ctx context.Context) {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
-	if err := database.SaveToDB(ctx, fs.storage, fs.filePath); err != nil {
+	if err := files.SaveToDB(ctx, fs.storage, fs.filePath); err != nil {
 		log.Error().Err(err).Msg("failed to save DB")
 	}
 }
@@ -45,7 +45,7 @@ func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) 
 		SyncRecord: fp.StoreInterval == 0,
 	}
 	if fp.RestoreOnStart {
-		err := database.LoadFromDB(ctx, fs.storage, fp.FileStoragePath)
+		err := files.LoadFromDB(ctx, fs.storage, fp.FileStoragePath)
 
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("LoadFromDB error %w", err)
@@ -84,7 +84,7 @@ func (fs *FileStorage) UpdateMetric(ctx context.Context, mType, mName string, mV
 	}
 
 	if fs.SyncRecord {
-		if err := database.SaveToDB(ctx, fs.storage, fs.filePath); err != nil {
+		if err := files.SaveToDB(ctx, fs.storage, fs.filePath); err != nil {
 			log.Error().Err(err).Msg("failed save storage")
 			return fmt.Errorf("failed save storage %w", err)
 		}
@@ -111,7 +111,7 @@ func (fs *FileStorage) GetMetric(ctx context.Context, mType, mName string) (any,
 	return val, nil
 }
 
-func (fs *FileStorage) GetAllMetrics(ctx context.Context) []mtr.Metric {
+func (fs *FileStorage) GetAllMetrics(ctx context.Context) []models.Metric {
 	return fs.storage.GetAllMetrics(ctx)
 }
 
