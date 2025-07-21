@@ -13,36 +13,30 @@ import (
 	"github.com/mailru/easyjson"
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
-func ConvertByType(mType, mValue string) (any, error) {
-	switch mType {
-	case mtr.GaugeType:
-		if val, err := strconv.ParseFloat(mValue, 64); err != nil {
-			return nil, fmt.Errorf("convert gauge value %s: %w", mValue, err)
-		} else {
-			return val, nil
-		}
-	case mtr.CounterType:
-		if val, err := strconv.ParseInt(mValue, 10, 64); err != nil {
-			return nil, fmt.Errorf("convert counter value %s: %w", mValue, err)
-		} else {
-			return val, nil
-		}
-	default:
-		return nil, fmt.Errorf("unknown metric type: %s", mType)
+type Server struct {
+	Storage col.Collector
+	Opts    *config.Options
+}
+
+func NewServer(col col.Collector, opts *config.Options) *Server {
+	return &Server{
+		Storage: col,
+		Opts:    opts,
 	}
 }
 
-func GetMetric(storage col.Collector) http.HandlerFunc {
+func (srv *Server) GetMetric() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
-		value, err := storage.GetMetric(req.Context(), mType, mName)
+		value, err := srv.Storage.GetMetric(req.Context(), mType, mName)
 		if err != nil {
 			http.Error(res, fmt.Sprintf("Metric %s was not found", mName), http.StatusNotFound)
 			return
@@ -70,9 +64,9 @@ func GetMetric(storage col.Collector) http.HandlerFunc {
 	}
 }
 
-func GetAllMetrics(storage col.Collector) http.HandlerFunc {
+func (srv *Server) GetAllMetrics() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		allMetrics := storage.GetAllMetrics(req.Context())
+		allMetrics := srv.Storage.GetAllMetrics(req.Context())
 
 		var metricsToTable []mtr.MetricTable
 
@@ -153,7 +147,7 @@ func GetAllMetrics(storage col.Collector) http.HandlerFunc {
 	}
 }
 
-func UpdateMetric(storage col.Collector) http.HandlerFunc {
+func (srv *Server) UpdateMetric() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
@@ -168,7 +162,7 @@ func UpdateMetric(storage col.Collector) http.HandlerFunc {
 			return
 		}
 
-		val, err := ConvertByType(mType, mValue)
+		val, err := converter.ConvertByType(mType, mValue)
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -180,7 +174,7 @@ func UpdateMetric(storage col.Collector) http.HandlerFunc {
 			return
 		}
 
-		if err := storage.UpdateMetric(req.Context(), mType, mName, val); err != nil {
+		if err := srv.Storage.UpdateMetric(req.Context(), mType, mName, val); err != nil {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -216,7 +210,7 @@ func FillMetricValueFromStorage(ctx context.Context, storage col.Collector, metr
 	return true
 }
 
-func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
+func (srv *Server) GetMetricsHandlerJSON() http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		var metric serialize.Metric
 
@@ -231,7 +225,7 @@ func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 			return
 		}
 
-		value, err := storage.GetMetric(req.Context(), metric.MType, metric.ID)
+		value, err := srv.Storage.GetMetric(req.Context(), metric.MType, metric.ID)
 		if err != nil {
 			log.Error().Err(err).Msg("can't get valid metric")
 			http.Error(resp, "can't get valid metric", http.StatusNotFound)
@@ -253,7 +247,7 @@ func GetMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 	}
 }
 
-func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
+func (srv *Server) UpdateMetricsHandlerJSON() http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		var reader io.Reader
 		if req.Header.Get("Content-Encoding") == "gzip" {
@@ -292,11 +286,11 @@ func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 			return
 		}
 
-		if err := storage.UpdateMetric(req.Context(), metric.MType, metric.ID, value); err != nil {
+		if err := srv.Storage.UpdateMetric(req.Context(), metric.MType, metric.ID, value); err != nil {
 			http.Error(resp, fmt.Sprintf("invalid update metric %s: %v", metric.ID, err), http.StatusBadRequest)
 		}
 
-		if !FillMetricValueFromStorage(req.Context(), storage, &metric) {
+		if !FillMetricValueFromStorage(req.Context(), srv.Storage, &metric) {
 			http.Error(resp, fmt.Sprintf("metric %s not found", metric.ID), http.StatusNotFound)
 			return
 		}
@@ -309,7 +303,7 @@ func UpdateMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 	}
 }
 
-func UpdatesMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
+func (srv *Server) UpdatesMetricsHandlerJSON() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		var jsonMetrics serialize.MetricsList
 
@@ -331,7 +325,7 @@ func UpdatesMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 		}
 
 		for _, metric := range metrics {
-			if err := storage.UpdateMetric(req.Context(), metric.Type(), metric.Name(), metric.Value()); err != nil {
+			if err := srv.Storage.UpdateMetric(req.Context(), metric.Type(), metric.Name(), metric.Value()); err != nil {
 				http.Error(w, fmt.Sprintf("failed update metric %v", err), http.StatusInternalServerError)
 				return
 			}
@@ -341,9 +335,9 @@ func UpdatesMetricsHandlerJSON(storage col.Collector) http.HandlerFunc {
 	}
 }
 
-func PingHandler(col col.Collector) http.HandlerFunc {
+func (srv *Server) PingHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := col.Ping(r.Context()); err != nil {
+		if err := srv.Storage.Ping(r.Context()); err != nil {
 			log.Error().Err(err).Msg("failed ping")
 			http.Error(w, "can't ping DB", http.StatusInternalServerError)
 			return

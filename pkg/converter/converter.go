@@ -2,11 +2,31 @@ package converter
 
 import (
 	"fmt"
+	"strconv"
 
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	"github.com/rs/zerolog/log"
 )
+
+func ConvertByType(mType, mValue string) (any, error) {
+	switch mType {
+	case mtr.GaugeType:
+		if val, err := strconv.ParseFloat(mValue, 64); err != nil {
+			return nil, fmt.Errorf("convert gauge value %s: %w", mValue, err)
+		} else {
+			return val, nil
+		}
+	case mtr.CounterType:
+		if val, err := strconv.ParseInt(mValue, 10, 64); err != nil {
+			return nil, fmt.Errorf("convert counter value %s: %w", mValue, err)
+		} else {
+			return val, nil
+		}
+	default:
+		return nil, fmt.Errorf("unknown metric type: %s", mType)
+	}
+}
 
 func ConvertMetrics(src serialize.MetricsList) ([]mtr.Metric, error) {
 	converted := make([]mtr.Metric, 0, len(src))

@@ -14,6 +14,7 @@ import (
 
 	colcfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector/config"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
@@ -116,7 +117,7 @@ func startServer(ctx context.Context, opts *config.Options) error {
 		}
 	}()
 
-	r := router.NewRouter(collector, opts)
+	r := router.NewRouter(server.NewServer(collector, opts))
 
 	srv := &http.Server{
 		Addr:    opts.EndPointAddr,

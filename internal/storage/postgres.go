@@ -92,6 +92,30 @@ func (db *Database) GetMetric(ctx context.Context, mType, mName string) (any, er
 	}
 }
 
+func fillMetricValues(metric *serialize.Metric, delta sql.NullInt64, value sql.NullFloat64) error {
+	switch {
+	case value.Valid:
+		if metric.MType != mtr.GaugeType {
+			return mtr.ErrInvalidMetricsType
+		}
+
+		metric.Value = &value.Float64
+
+	case delta.Valid:
+		if metric.MType != mtr.CounterType {
+			return mtr.ErrInvalidMetricsType
+		}
+
+		metric.Delta = &delta.Int64
+
+	default:
+		log.Error().Msg("not valid value")
+		return nil
+	}
+
+	return nil
+}
+
 func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
 	metrics := make(serialize.MetricsList, 0)
 
@@ -123,22 +147,8 @@ func (db *Database) GetAllMetrics(ctx context.Context) []mtr.Metric {
 			return nil
 		}
 
-		switch {
-		case value.Valid:
-			if metric.MType != mtr.GaugeType {
-				return nil
-			}
-
-			metric.Value = &value.Float64
-
-		case delta.Valid:
-			if metric.MType != mtr.CounterType {
-				return nil
-			}
-
-			metric.Delta = &delta.Int64
-		default:
-			log.Error().Msg("not valid value")
+		if err := fillMetricValues(&metric, delta, value); err != nil {
+			log.Error().Err(err).Msg("can't set values")
 			return nil
 		}
 
@@ -247,9 +257,9 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 
 func (db *Database) Ping(ctx context.Context) error {
 	if err := db.DB.PingContext(ctx); err != nil {
-        return fmt.Errorf("failed ping database: %w", err)
-    }
-    return nil
+		return fmt.Errorf("failed ping database: %w", err)
+	}
+	return nil
 }
 
 func (db *Database) Close() error {

@@ -11,6 +11,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
@@ -41,7 +42,7 @@ func TestUpdateMetric(t *testing.T) {
 	}()
 
 	storage := storage.NewMemStorage()
-	router := router.NewRouter(storage, opts)
+	router := router.NewRouter(server.NewServer(storage, opts))
 
 	tests := []struct {
 		name       string
@@ -142,7 +143,7 @@ func TestGetMetric(t *testing.T) {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 
-	router := router.NewRouter(storage, opts)
+	router := router.NewRouter(server.NewServer(storage, opts))
 
 	tests := []struct {
 		name       string

@@ -13,6 +13,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/mailru/easyjson"
 
+	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
@@ -20,7 +21,7 @@ import (
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
-func UpdateAllMetrics(ctx context.Context, storage *storage.MemStorage) {
+func UpdateAllMetrics(ctx context.Context, storage col.Collector) {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
