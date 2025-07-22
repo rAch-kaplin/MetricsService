@@ -15,7 +15,6 @@ import (
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
-	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
@@ -48,44 +47,20 @@ func UpdateAllMetrics(ctx context.Context, storage col.Collector) {
 	}
 }
 
-func SendAllMetrics(ctx context.Context, client *resty.Client, storage *repo.MemStorage) {
-	allMetrics, err := storage.GetAllMetrics(ctx)
+func (uc *AgentUsecase) SendAllMetrics(ctx context.Context, client *resty.Client) {
+	allMetrics, err := uc.GetAllMetrics(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to Get metrics")
 	}
 
+	log.Debug().Msgf("send all metrics: got %d metrics", len(allMetrics))
 	for _, metric := range allMetrics {
-		mType := metric.Type()
-		mName := metric.Name()
-
-		metricJSON := serialize.Metric{
-			ID:    mName,
-			MType: mType,
+		jsonMetric, err := uc.GetMetricJSON(ctx, metric)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to get json metric")
 		}
 
-		switch mType {
-		case models.GaugeType:
-			val, ok := metric.Value().(float64)
-			if !ok {
-				log.Error().Str("metric_name", mName).Str("metric_type", mType).
-					Msg("Invalid metric value type")
-				continue
-			}
-
-			metricJSON.Value = &val
-			sendMetric(client, &metricJSON)
-
-		case models.CounterType:
-			val, ok := metric.Value().(int64)
-			if !ok {
-				log.Error().Str("metric_name", mName).Str("metric_type", mType).
-					Msg("Invalid metric value type")
-				continue
-			}
-
-			metricJSON.Delta = &val
-			sendMetric(client, &metricJSON)
-		}
+		sendMetric(client, jsonMetric)
 	}
 }
 
@@ -96,6 +71,7 @@ func sendMetric(client *resty.Client, metricJSON *serialize.Metric) {
 		1 * time.Second,
 	}
 
+	log.Debug().Msg("sendMetric")
 	buf, ok, err := ConvertToGzipData(metricJSON)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to convert metric to gzip")

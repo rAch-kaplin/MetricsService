@@ -108,7 +108,8 @@ func init() {
 }
 
 func startAgent(ctx context.Context) {
-	storage := repo.NewMemStorage()
+	metricStorage := repo.NewMemStorage()
+	agentUsecase := agent.NewAgentUsecase(metricStorage)
 
 	client := resty.New().
 		SetTimeout(5 * time.Second).
@@ -128,9 +129,9 @@ func startAgent(ctx context.Context) {
 			return
 
 		case <-pollTimer.C:
-			agent.UpdateAllMetrics(ctx, storage)
+			agent.UpdateAllMetrics(ctx, metricStorage)
 		case <-reportTimer.C:
-			agent.SendAllMetrics(ctx, client, storage)
+			agentUsecase.SendAllMetrics(ctx, client)
 		}
 	}
 }

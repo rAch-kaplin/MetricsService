@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"context"
-	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,8 +12,9 @@ import (
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -29,20 +29,8 @@ func TestUpdateMetric(t *testing.T) {
 		opt(opts)
 	}
 
-	//FIXME
-	db, err := sql.Open("pgx", opts.DataBaseDSN)
-	if err != nil {
-		log.Error().Err(err).Msg("sql.Open error")
-		panic(err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Error().Err(err).Msg("Failed to db.Close")
-		}
-	}()
-
-	storage := repo.NewMemStorage()
-	router := router.NewRouter(server.NewServer(storage, opts))
+	metricUsecase := usecase.NewMetricUsecase(repo.NewMemStorage())
+	router := router.NewRouter(server.NewServer(metricUsecase, opts))
 
 	tests := []struct {
 		name       string
@@ -119,18 +107,6 @@ func TestGetMetric(t *testing.T) {
 		opt(opts)
 	}
 
-	//FIXME
-	db, err := sql.Open("pgx", opts.DataBaseDSN)
-	if err != nil {
-		log.Error().Err(err).Msg("sql.Open error")
-		panic(err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Error().Err(err).Msg("Failed to db.Close")
-		}
-	}()
-
 	//FIXME - maybe need mocks
 	ctx := context.Background()
 	storage := repo.NewMemStorage()
@@ -143,7 +119,8 @@ func TestGetMetric(t *testing.T) {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 
-	router := router.NewRouter(server.NewServer(storage, opts))
+	metricUsecase := usecase.NewMetricUsecase(storage)
+	router := router.NewRouter(server.NewServer(metricUsecase, opts))
 
 	tests := []struct {
 		name       string

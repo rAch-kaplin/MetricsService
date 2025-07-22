@@ -6,27 +6,25 @@ import (
 	"html/template"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/mailru/easyjson"
 
-	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
-	models "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
 type Server struct {
-	Storage col.Collector
+	Usecase *usecase.MetricUsecase
 	Opts    *config.Options
 }
 
-func NewServer(col col.Collector, opts *config.Options) *Server {
+func NewServer(uc *usecase.MetricUsecase, opts *config.Options) *Server {
 	return &Server{
-		Storage: col,
+		Usecase: uc,
 		Opts:    opts,
 	}
 }
@@ -35,20 +33,10 @@ func (srv *Server) GetMetric() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
-		metric, err := srv.Storage.GetMetric(req.Context(), mType, mName)
+
+		valueStr, err := srv.Usecase.GetMetricStr(req.Context(), mType, mName)
 		if err != nil {
 			http.Error(res, fmt.Sprintf("Metric %s was not found", mName), http.StatusNotFound)
-			return
-		}
-
-		var valueStr string
-		switch v := metric.Value().(type) {
-		case float64:
-			valueStr = strconv.FormatFloat(v, 'f', -1, 64)
-		case int64:
-			valueStr = strconv.FormatInt(v, 10)
-		default:
-			http.Error(res, "an unexpected type of metric", http.StatusInternalServerError)
 			return
 		}
 
@@ -65,43 +53,11 @@ func (srv *Server) GetMetric() http.HandlerFunc {
 
 func (srv *Server) GetAllMetrics() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		allMetrics, err := srv.Storage.GetAllMetrics(req.Context())
+		metricsToTable, err := srv.Usecase.GetAllMetrics(req.Context())
 		if err != nil {
 			log.Error().Err(err).Msg("failed to Get metrics")
-		}
-
-		var metricsToTable []models.MetricTable
-
-		for _, metric := range allMetrics {
-			var valStr string
-			mName := metric.Name()
-			mType := metric.Type()
-
-			switch mType {
-			case models.GaugeType:
-				val, ok := metric.Value().(float64)
-				if !ok {
-					log.Error().Str("metric_name", mName).Str("metric_type", mType).
-						Msg("Invalid metric value type")
-					continue
-				}
-				valStr = strconv.FormatFloat(val, 'f', -1, 64)
-
-			case models.CounterType:
-				val, ok := metric.Value().(int64)
-				if !ok {
-					log.Error().Str("metric_name", mName).Str("metric_type", mType).
-						Msg("Invalid metric value type")
-					continue
-				}
-				valStr = strconv.FormatInt(val, 10)
-			}
-
-			metricsToTable = append(metricsToTable, models.MetricTable{
-				Name:  mName,
-				Type:  mType,
-				Value: valStr,
-			})
+			http.Error(res, "failed to get metrics", http.StatusNotFound)
+			return
 		}
 
 		const htmlTemplate = `
@@ -176,7 +132,7 @@ func (srv *Server) UpdateMetric() http.HandlerFunc {
 			return
 		}
 
-		if err := srv.Storage.UpdateMetric(req.Context(), mType, mName, val); err != nil {
+		if err := srv.Usecase.UpdateMetric(req.Context(), mType, mName, val); err != nil {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -205,7 +161,7 @@ func (srv *Server) GetMetricsHandlerJSON() http.HandlerFunc {
 		}
 
 		log.Debug().Str("type", jsonMetric.MType).Str("name", jsonMetric.ID).Msg("")
-		metric, err := srv.Storage.GetMetric(req.Context(), jsonMetric.MType, jsonMetric.ID)
+		metric, err := srv.Usecase.GetMetric(req.Context(), jsonMetric.MType, jsonMetric.ID)
 		if err != nil {
 			log.Error().Err(err).Msg("can't get valid metric")
 			http.Error(resp, "can't get valid metric", http.StatusNotFound)
@@ -266,12 +222,12 @@ func (srv *Server) UpdateMetricsHandlerJSON() http.HandlerFunc {
 			return
 		}
 
-		if err := srv.Storage.UpdateMetric(req.Context(), jsonMetric.MType, jsonMetric.ID, value); err != nil {
+		if err := srv.Usecase.UpdateMetric(req.Context(), jsonMetric.MType, jsonMetric.ID, value); err != nil {
 			http.Error(resp, fmt.Sprintf("invalid update metric %s: %v", jsonMetric.ID, err), http.StatusBadRequest)
 			return
 		}
 
-		newMetric, err := srv.Storage.GetMetric(req.Context(), jsonMetric.MType, jsonMetric.ID)
+		newMetric, err := srv.Usecase.GetMetric(req.Context(), jsonMetric.MType, jsonMetric.ID)
 		if err != nil {
 			log.Error().Err(err).Msg("can't get new value metric")
 			http.Error(resp, "can't get new value metric", http.StatusNotFound)
@@ -314,7 +270,7 @@ func (srv *Server) UpdatesMetricsHandlerJSON() http.HandlerFunc {
 		}
 
 		for _, metric := range metrics {
-			if err := srv.Storage.UpdateMetric(req.Context(), metric.Type(), metric.Name(), metric.Value()); err != nil {
+			if err := srv.Usecase.UpdateMetric(req.Context(), metric.Type(), metric.Name(), metric.Value()); err != nil {
 				http.Error(w, fmt.Sprintf("failed update metric %v", err), http.StatusInternalServerError)
 				return
 			}
@@ -326,7 +282,7 @@ func (srv *Server) UpdatesMetricsHandlerJSON() http.HandlerFunc {
 
 func (srv *Server) PingHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := srv.Storage.Ping(r.Context()); err != nil {
+		if err := srv.Usecase.Ping(r.Context()); err != nil {
 			log.Error().Err(err).Msg("failed ping")
 			http.Error(w, "can't ping DB", http.StatusInternalServerError)
 			return
