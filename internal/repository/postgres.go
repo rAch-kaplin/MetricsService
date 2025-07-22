@@ -73,7 +73,7 @@ func (db *Database) GetMetric(ctx context.Context, mType, mName string) (models.
 	if Type != mType {
         return nil, models.ErrInvalidMetricsType
     }
-	
+
 	switch {
 	case value.Valid:
 		if Type != models.GaugeType {
@@ -139,6 +139,11 @@ func (db *Database) GetAllMetrics(ctx context.Context) ([]models.Metric, error) 
 			return nil, fmt.Errorf("incorrectly metric type %v", models.ErrInvalidMetricsType)
 		}
 
+	}
+
+	if rows.Err() != nil {
+		log.Error().Err(rows.Err()).Msg("have rows error")
+		return nil, rows.Err()
 	}
 
 	return metrics, nil
