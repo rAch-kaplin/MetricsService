@@ -65,3 +65,4 @@ func ConvertMetric(src serialize.Metric) (models.Metric, error) {
 
 	return converted, nil
 }
+

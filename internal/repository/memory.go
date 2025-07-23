@@ -58,7 +58,12 @@ func (ms *MemStorage) GetMetric(_ context.Context, mType, mName string) (models.
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
-	metric, ok := ms.storage[mType][mName]
+	typedMetric, ok := ms.storage[mType]
+	if !ok {
+		return nil, models.ErrInvalidMetricsType
+	}
+
+	metric, ok := typedMetric[mName]
 	if !ok {
 		return nil, models.ErrMetricsNotFound
 	}

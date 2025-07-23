@@ -1,11 +1,13 @@
-package repository
+package repository_test
 
 import (
 	"context"
-	"sync"
 	"testing"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMemStorage_UpdateMetric(t *testing.T) {
@@ -97,23 +99,25 @@ func TestMemStorage_UpdateMetric(t *testing.T) {
 	for i := range tests {
 		tt := &tests[i]
 		t.Run(tt.name, func(t *testing.T) {
-			ms := &MemStorage{
-				mutex:   sync.RWMutex{},
-				storage: tt.fields.storage,
+			ms := repository.NewMemStorage()
+
+			for metricType, metrics := range tt.fields.storage {
+				for name, metric := range metrics {
+					_ = ms.UpdateMetric(ctx, metricType, name, metric.Value())
+				}
 			}
-			if err := ms.UpdateMetric(ctx, tt.args.mType, tt.args.mName, tt.args.mValue); (err != nil) != tt.wantErr {
-				t.Errorf("MemStorage.UpdateMetric() error = %v, wantErr %v", err, tt.wantErr)
+
+			err := ms.UpdateMetric(ctx, tt.args.mType, tt.args.mName, tt.args.mValue)
+			if tt.wantErr {
+				require.Error(t, err, "MemStorage.UpdateMetric() error = %v, wantErr = %v", err, tt.wantErr)
+			} else {
+				require.NoError(t, err, "MemStorage.UpdateMetric() error = %v, wantErr = %v", err, tt.wantErr)
 			}
 
 			if !tt.wantErr {
 				metric, err := ms.GetMetric(ctx, tt.args.mType, tt.args.mName)
-				if err != nil {
-					t.Errorf("metric not found")
-					return
-				}
-				if metric.Value() != tt.wantResult {
-					t.Errorf("got = %v, want = %v", metric.Value(), tt.wantResult)
-				}
+				require.NoError(t, err, "metric not found")
+				assert.Equal(t, tt.wantResult, metric.Value(), "got = %v, want = %v", metric.Value(), tt.wantResult)
 			}
 		})
 	}
@@ -175,19 +179,21 @@ func TestMemStorage_GetMetric(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ms := &MemStorage{
-				mutex:   sync.RWMutex{},
-				storage: tt.fields,
+			ms := repository.NewMemStorage()
+
+			for metricType, metrics := range tt.fields {
+				for name, metric := range metrics {
+					_ = ms.UpdateMetric(ctx, metricType, name, metric.Value())
+				}
 			}
+
 			metric, err := ms.GetMetric(ctx, tt.mType, tt.mName)
 
-			if (err == nil) != tt.wantOk {
-				t.Errorf("GetMetric() error = %v, wantOk = %v", err, tt.wantOk)
-				return
-			}
-
-			if tt.wantOk && metric.Value() != tt.wantVal {
-				t.Errorf("GetMetric() gotVal = %v, want %v", metric.Value(), tt.wantVal)
+			if tt.wantOk {
+				require.NoError(t, err, "GetMetric() error = %v, wantOk = %v", err, tt.wantOk)
+				assert.Equal(t, tt.wantVal, metric.Value(), "GetMetric() gotVal = %v, want %v", metric.Value(), tt.wantVal)
+			} else {
+				require.Error(t, err, "GetMetric() error = %v, wantOk = %v", err, tt.wantOk)
 			}
 		})
 	}
@@ -239,50 +245,42 @@ func TestMemStorage_GetAllMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ms := &MemStorage{
-				mutex:   sync.RWMutex{},
-				storage: tt.storage,
+			ms := repository.NewMemStorage()
+
+			for metricType, metrics := range tt.storage {
+				for name, metric := range metrics {
+					_ = ms.UpdateMetric(ctx, metricType, name, metric.Value())
+				}
 			}
 
 			got, err := ms.GetAllMetrics(ctx)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			require.NoError(t, err, "unexpected error: %v", err)
 
 			gotMap := make(map[string]models.Metric)
 			for _, m := range got {
 				gotMap[m.Name()] = m
 			}
 
-			if len(gotMap) != len(tt.want) {
-				t.Errorf("wrong number of metrics: got %d, want %d", len(gotMap), len(tt.want))
-			}
+			assert.Equal(t, len(tt.want), len(gotMap), "wrong number of metrics: got %d, want %d", len(gotMap), len(tt.want))
 
 			for name, wantMetric := range tt.want {
 				gotMetric, ok := gotMap[name]
+				assert.True(t, ok, "missing metric: %s", name)
 				if !ok {
-					t.Errorf("missing metric: %s", name)
 					continue
 				}
 
-				if gotMetric.Type() != wantMetric.Type() {
-					t.Errorf("metric %s type mismatch: got %s, want %s", name, gotMetric.Type(), wantMetric.Type())
-				}
+				assert.Equal(t, wantMetric.Type(), gotMetric.Type(), "metric %s type mismatch: got %s, want %s", name, gotMetric.Type(), wantMetric.Type())
 
 				switch wantMetric.Type() {
 				case models.CounterType:
-					if gotMetric.Value() == nil {
-						t.Errorf("metric %s: expected counter delta, got nil", name)
-					}
+					assert.NotNil(t, gotMetric.Value(), "metric %s: expected counter delta, got nil", name)
 				case models.GaugeType:
-					if gotMetric.Value() == nil {
-						t.Errorf("metric %s: expected gauge value, got nil", name)
-					}
+					assert.NotNil(t, gotMetric.Value(), "metric %s: expected gauge value, got nil", name)
 				default:
-					t.Errorf("metric %s: unknown type %s", name, wantMetric.Type())
+					assert.Fail(t, "unknown metric type", "metric %s: unknown type %s", name, wantMetric.Type())
 				}
 			}
 		})
 	}
 }
-

@@ -1,6 +1,12 @@
-package models
+package models_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestCounterUpdate(t *testing.T) {
 	type fields struct {
@@ -68,17 +74,14 @@ func TestCounterUpdate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &counter{
-				name:  tt.fields.name,
-				value: tt.fields.value,
-			}
+			c := models.NewCounter(tt.fields.name, tt.fields.value)
 			err := c.Update(tt.args.mValue)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Update() error = %v, wantErr = %v", err, tt.wantErr)
+			if tt.wantErr {
+				require.Error(t, err, "Update() error = %v, wantErr = %v", err, tt.wantErr)
+			} else {
+				require.NoError(t, err, "Update() error = %v, wantErr = %v", err, tt.wantErr)
 			}
-			if c.value != tt.wantValue {
-				t.Errorf("Update() value = %v, wantValue = %v", c.value, tt.wantValue)
-			}
+			assert.Equal(t, tt.wantValue, c.Value(), "Update() value = %v, wantValue = %v", c.Value(), tt.wantValue)
 		})
 	}
 }

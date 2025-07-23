@@ -16,6 +16,7 @@ import (
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUpdateMetric(t *testing.T) {
@@ -89,9 +90,7 @@ func TestUpdateMetric(t *testing.T) {
 
 			router.ServeHTTP(rr, req)
 
-			if rr.Code != tt.wantStatus {
-				t.Errorf("Test %s: expected status %d, got %d", tt.name, tt.wantStatus, rr.Code)
-			}
+			assert.Equal(t, tt.wantStatus, rr.Code, "Test %s: expected status %d, got %d", tt.name, tt.wantStatus, rr.Code)
 		})
 	}
 }
@@ -167,13 +166,9 @@ func TestGetMetric(t *testing.T) {
 
 			router.ServeHTTP(rr, req)
 
-			if rr.Code != tt.wantStatus {
-				t.Errorf("Test %s: expected status %d, got %d", tt.name, tt.wantStatus, rr.Code)
-			}
+			assert.Equal(t, tt.wantStatus, rr.Code, "Test %s: expected status %d, got %d", tt.name, tt.wantStatus, rr.Code)
 			body, _ := io.ReadAll(rr.Body)
-			if string(body) != tt.wantBody {
-				t.Errorf("Test %s: expected body %q, got %q", tt.name, tt.wantBody, string(body))
-			}
+			assert.Equal(t, tt.wantBody, string(body), "Test %s: expected body %q, got %q", tt.name, tt.wantBody, string(body))
 		})
 	}
 }
