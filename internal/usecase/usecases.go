@@ -27,25 +27,6 @@ func (uc *MetricUsecase) GetMetric(ctx context.Context, mType, mName string) (mo
 	return metric, nil
 }
 
-func (uc *MetricUsecase) GetMetricStr(ctx context.Context, mType, mName string) (string, error) {
-	metric, err := uc.repo.GetMetric(ctx, mType, mName)
-	if err != nil {
-		return "", fmt.Errorf("metric not found: %w", err)
-	}
-
-	var valueStr string
-	switch v := metric.Value().(type) {
-	case float64:
-		valueStr = strconv.FormatFloat(v, 'f', -1, 64)
-	case int64:
-		valueStr = strconv.FormatInt(v, 10)
-	default:
-		return "", models.ErrInvalidValueType
-	}
-
-	return valueStr, nil
-}
-
 func (uc *MetricUsecase) GetAllMetrics(ctx context.Context) ([]models.MetricTable, error) {
 	allMetrics, err := uc.repo.GetAllMetrics(ctx)
 	if err != nil {
@@ -93,6 +74,16 @@ func (uc *MetricUsecase) GetAllMetrics(ctx context.Context) ([]models.MetricTabl
 func (uc *MetricUsecase) UpdateMetric(ctx context.Context, mType, mName string, value any) error {
 	if err := uc.repo.UpdateMetric(ctx, mType, mName, value); err != nil {
 		return fmt.Errorf("failed to update metric: %w", err)
+	}
+
+	return nil
+}
+
+func (uc *MetricUsecase) UpdateMetricList(ctx context.Context, metrics []models.Metric) error {
+	for _, metric := range metrics {
+		if err := uc.UpdateMetric(ctx, metric.Type(), metric.Name(), metric.Value()); err != nil {
+			return fmt.Errorf("failed to update metric: %w", err)
+		}
 	}
 
 	return nil

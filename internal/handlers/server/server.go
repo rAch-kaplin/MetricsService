@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/mailru/easyjson"
@@ -19,13 +20,11 @@ import (
 
 type Server struct {
 	Usecase *usecase.MetricUsecase
-	Opts    *config.Options
 }
 
 func NewServer(uc *usecase.MetricUsecase, opts *config.Options) *Server {
 	return &Server{
 		Usecase: uc,
-		Opts:    opts,
 	}
 }
 
@@ -34,9 +33,21 @@ func (srv *Server) GetMetric() http.HandlerFunc {
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
 
-		valueStr, err := srv.Usecase.GetMetricStr(req.Context(), mType, mName)
+		metric, err := srv.Usecase.GetMetric(req.Context(), mType, mName)
 		if err != nil {
+			log.Error().Err(err).Msg("can't get valid metric")
 			http.Error(res, fmt.Sprintf("Metric %s was not found", mName), http.StatusNotFound)
+			return
+		}
+
+		var valueStr string
+		switch v := metric.Value().(type) {
+		case float64:
+			valueStr = strconv.FormatFloat(v, 'f', -1, 64)
+		case int64:
+			valueStr = strconv.FormatInt(v, 10)
+		default:
+			http.Error(res, "an unexpected type of metric", http.StatusInternalServerError)
 			return
 		}
 
@@ -269,11 +280,10 @@ func (srv *Server) UpdatesMetricsHandlerJSON() http.HandlerFunc {
 			return
 		}
 
-		for _, metric := range metrics {
-			if err := srv.Usecase.UpdateMetric(req.Context(), metric.Type(), metric.Name(), metric.Value()); err != nil {
-				http.Error(w, fmt.Sprintf("failed update metric %v", err), http.StatusInternalServerError)
-				return
-			}
+		if err := srv.Usecase.UpdateMetricList(req.Context(), metrics); err != nil {
+			log.Error().Err(err).Msg("failed update metrics")
+			http.Error(w, fmt.Sprintf("failed update metrics: %v", err), http.StatusInternalServerError)
+			return
 		}
 
 		w.WriteHeader(http.StatusOK)

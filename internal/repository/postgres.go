@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	sq "github.com/Masterminds/squirrel"
+
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	errH "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/errors-handlers"
@@ -36,7 +38,6 @@ func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error)
 		if err := db.Close(); err != nil {
 			log.Error().Err(err).Msg("failed to close database")
 		}
-
 		log.Error().Err(err).Msg("failed create table for database")
 		return nil, fmt.Errorf("failed create table for database %w", err)
 	}
@@ -55,9 +56,17 @@ func (db *Database) GetMetric(ctx context.Context, mType, mName string) (models.
 	)
 
 	getMtr := func() error {
-		row := db.DB.QueryRowContext(ctx,
-			`SELECT "ID", "MType", "Delta", "Value" FROM collector `+
-				`WHERE "ID" = $1 AND "MType" = $2 LIMIT 1`, mName, mType)
+		builder := sq.Select(`"ID"`, `"MType"`, `"Delta"`, `"Value"`).
+			From("collector").
+			Where(sq.Eq{`"ID"`: mName, `"MType"`: mType}).
+			Limit(1).
+			PlaceholderFormat(sq.Dollar)
+
+		query, args, err := builder.ToSql()
+		if err != nil {
+			return fmt.Errorf("failed to build query: %w", err)
+		}
+		row := db.DB.QueryRowContext(ctx, query, args...)
 
 		return row.Scan(&id, &Type, &delta, &value)
 	}
@@ -71,8 +80,8 @@ func (db *Database) GetMetric(ctx context.Context, mType, mName string) (models.
 	}
 
 	if Type != mType {
-        return nil, models.ErrInvalidMetricsType
-    }
+		return nil, models.ErrInvalidMetricsType
+	}
 
 	switch {
 	case value.Valid:
@@ -95,8 +104,15 @@ func (db *Database) GetMetric(ctx context.Context, mType, mName string) (models.
 }
 
 func (db *Database) GetAllMetrics(ctx context.Context) ([]models.Metric, error) {
-	rows, err := db.DB.QueryContext(ctx,
-		"SELECT ID, MType, Delta, Value FROM collector")
+	builder := sq.Select(`"ID"`, `"MType"`, `"Delta"`, `"Value"`).
+		From("collector")
+
+	query, args, err := builder.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	rows, err := db.DB.QueryContext(ctx, query, args...)
 
 	if err != nil {
 		log.Error().Err(err).Msg("The request was not processed")
@@ -179,14 +195,21 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 	}()
 
 	exec := func() error {
-		_, err := tx.ExecContext(ctx, `
-			INSERT INTO collector ("ID", "MType", "Delta", "Value")
-			VALUES ($1, $2, $3, $4)
-			ON CONFLICT ("ID") DO UPDATE
-			SET "Delta" = collector."Delta" + EXCLUDED."Delta",
-				"Value" = EXCLUDED."Value",
-				"MType" = EXCLUDED."MType"`,
-			mName, mType, delta, value)
+		builder := sq.Insert("collector").
+			Columns(`"ID"`, `"MType"`, `"Delta"`, `"Value"`).
+			Values(mName, mType, delta, value).
+			Suffix(`ON CONFLICT ("ID") DO UPDATE SET
+			"Delta" = collector."Delta" + EXCLUDED."Delta",
+			"Value" = EXCLUDED."Value",
+			"MType" = EXCLUDED."MType"`).
+			PlaceholderFormat(sq.Dollar)
+
+		query, args, err := builder.ToSql()
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.ExecContext(ctx, query, args...)
 		return err
 	}
 
