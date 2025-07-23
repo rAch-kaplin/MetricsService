@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
@@ -21,56 +21,52 @@ func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
 
 	data := make(serialize.MetricsList, 0, len(allMetrics))
 
-	for _, metric := range allMetrics {
-		var newMetric serialize.Metric
-		newMetric.MType = metric.Type()
-		newMetric.ID = metric.Name()
-
-		switch metric.Type() {
-		case models.GaugeType:
-			val, ok := metric.Value().(float64)
-			if !ok {
-				return fmt.Errorf("invalid gauge metric value")
-			}
-			newMetric.Value = &val
-		case models.CounterType:
-			val, ok := metric.Value().(int64)
-			if !ok {
-				return fmt.Errorf("invalid counter metric value")
-			}
-			newMetric.Delta = &val
-		default:
-			return fmt.Errorf("unknown metric type")
-		}
-		data = append(data, newMetric)
+	jsonMetrics, err := converter.ConverToSerialization(allMetrics)
+	if err != nil {
+		return fmt.Errorf("convert metrics error: %w", err)
 	}
 
-	if len(data) == 0 {
+	if len(jsonMetrics) == 0 {
 		log.Warn().Msg("No metrics to save, skipping file write")
 		return nil
 	}
 
-	bytes, err := json.MarshalIndent(data, "", "  ")
+	bytes, err := json.MarshalIndent(jsonMetrics, "", "  ")
 	if err != nil {
 		return fmt.Errorf("json marshal error: %w", err)
 	}
 
+	err = WriteFileAtomic(path, bytes)
+	if err != nil {
+		return fmt.Errorf("write file atomic error: %w", err)
+	}
+
+	log.Info().
+		Str("path", path).
+		Int("metrics_saved", len(data)).
+		Msg("Metrics successfully saved")
+
+	return nil
+}
+
+func WriteFileAtomic(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	tmpPath := path + ".tmp"
+
 	file, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	defer func() {
-		if err := file.Close(); err != nil {
-			log.Error().Err(err).Msg("failed to close file")
+		if cerr := file.Close(); cerr != nil {
+			log.Error().Err(cerr).Msg("failed to close file")
 		}
 	}()
 
-	if _, err := file.Write(bytes); err != nil {
+	if _, err := file.Write(data); err != nil {
 		return fmt.Errorf("write failed: %w", err)
 	}
 
@@ -82,13 +78,9 @@ func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
 		return fmt.Errorf("rename failed: %w", err)
 	}
 
-	log.Info().
-		Str("path", path).
-		Int("metrics_saved", len(data)).
-		Msg("Metrics successfully saved")
-
 	return nil
 }
+
 
 func LoadFromDB(ctx context.Context, collector col.Collector, path string) error {
 	log.Info().
@@ -111,18 +103,15 @@ func LoadFromDB(ctx context.Context, collector col.Collector, path string) error
 		return fmt.Errorf("can't parse json format from DB %w", err)
 	}
 
-	for _, metric := range data {
-		switch metric.MType {
-		case models.GaugeType:
-			if err := collector.UpdateMetric(ctx, metric.MType, metric.ID, *metric.Value); err != nil {
-				log.Error().Err(err).Msg("update metric error")
-				return fmt.Errorf("update metric error %w", err)
-			}
-		case models.CounterType:
-			if err := collector.UpdateMetric(ctx, metric.MType, metric.ID, *metric.Delta); err != nil {
-				log.Error().Err(err).Msg("update metric error")
-				return fmt.Errorf("update metric error %w", err)
-			}
+	metrics, err := converter.ConvertMetrics(data)
+	if err != nil {
+		return fmt.Errorf("convert metrics error: %w", err)
+	}
+
+	for _, metric := range metrics {
+		if err := collector.UpdateMetric(ctx, metric.Type(), metric.Name(), metric.Value()); err != nil {
+			log.Error().Err(err).Msg("update metric error")
+			return fmt.Errorf("update metric error %w", err)
 		}
 	}
 

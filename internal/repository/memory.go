@@ -14,43 +14,43 @@ type MemStorage struct {
 
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		storage: make(map[string]map[string]models.Metric),
+		storage: map[string]map[string]models.Metric{
+			models.GaugeType:   make(map[string]models.Metric),
+			models.CounterType: make(map[string]models.Metric),
+		},
 	}
 }
 
 func (ms *MemStorage) UpdateMetric(_ context.Context, mType, mName string, mValue any) error {
 	ms.mutex.Lock()
 	defer ms.mutex.Unlock()
-
-	if _, ok := ms.storage[mType]; !ok {
-		ms.storage[mType] = make(map[string]models.Metric)
+	if mName == "" {
+		return models.ErrMetricsNotFound
 	}
 
-	if oldMetric, ok := ms.storage[mType][mName]; ok {
-		return oldMetric.Update(mValue)
+	if _, ok := ms.storage[mType]; !ok {
+		return models.ErrInvalidMetricsType
+	}
+
+	if metric, ok := ms.storage[mType][mName]; ok {
+		return metric.Update(mValue)
 	}
 
 	var newMetric models.Metric
 
 	switch mType {
 	case models.GaugeType:
-		value, ok := mValue.(float64)
-		if !ok {
-			return models.ErrInvalidValueType
-		}
-		newMetric = models.NewGauge(mName, value)
+		newMetric = models.NewGauge(mName, 0)
 	case models.CounterType:
-		value, ok := mValue.(int64)
-		if !ok {
-			return models.ErrInvalidValueType
-		}
-		newMetric = models.NewCounter(mName, value)
+		newMetric = models.NewCounter(mName, 0)
 	default:
 		return models.ErrInvalidMetricsType
 	}
 
+	if err := newMetric.Update(mValue); err != nil {
+		return err
+	}
 	ms.storage[mType][mName] = newMetric
-
 	return nil
 }
 

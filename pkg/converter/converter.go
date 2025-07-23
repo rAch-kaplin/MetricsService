@@ -32,7 +32,7 @@ func ConvertMetrics(src serialize.MetricsList) ([]models.Metric, error) {
 	converted := make([]models.Metric, 0, len(src))
 
 	for _, m := range src {
-		metric, err := ConvertMetric(m)
+		metric, err := сonvertMetric(m)
 		if err != nil {
 			log.Error().Err(err).Msg("failed convert metric")
 			return nil, fmt.Errorf("metric failed convert %+v", m)
@@ -44,7 +44,7 @@ func ConvertMetrics(src serialize.MetricsList) ([]models.Metric, error) {
 	return converted, nil
 }
 
-func ConvertMetric(src serialize.Metric) (models.Metric, error) {
+func сonvertMetric(src serialize.Metric) (models.Metric, error) {
 	var converted models.Metric
 
 	switch src.MType {
@@ -66,3 +66,51 @@ func ConvertMetric(src serialize.Metric) (models.Metric, error) {
 	return converted, nil
 }
 
+func сonvertToSerialization(src models.Metric) (serialize.Metric, error) {
+	var converted serialize.Metric
+
+	switch src.Type() {
+	case models.GaugeType:
+		value, ok := src.Value().(float64)
+		if !ok {
+			return serialize.Metric{}, fmt.Errorf("invalid gauge value: %v", src.Value())
+		}
+		converted = serialize.Metric{
+			ID:    src.Name(),
+			MType: src.Type(),
+			Value: &value,
+		}
+
+	case models.CounterType:
+		delta, ok := src.Value().(int64)
+		if !ok {
+			return serialize.Metric{}, fmt.Errorf("invalid counter value: %v", src.Value())
+		}
+		converted = serialize.Metric{
+			ID:    src.Name(),
+			MType: src.Type(),
+			Delta: &delta,
+		}
+
+	default:
+		return serialize.Metric{}, fmt.Errorf("unknown metric type: %s", src.Type())
+	}
+
+	return converted, nil
+}
+
+func ConverToSerialization(src []models.Metric) ([]serialize.Metric, error) {
+	converted := make([]serialize.Metric, 0, len(src))
+
+	for _, mtr := range src {
+		metric, err := сonvertToSerialization(mtr)
+		if err != nil {
+			log.Error().Err(err).Msg("failed convert metric")
+			return nil, fmt.Errorf("metric failed convert %+v", mtr)
+		}
+
+		converted = append(converted, metric)
+	}
+
+	return converted, nil
+}

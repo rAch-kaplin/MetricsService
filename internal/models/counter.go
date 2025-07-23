@@ -33,11 +33,3 @@ func (c *counter) Update(mValue any) error {
 	return nil
 }
 
-func (c *counter) SetValue(v any) error {
-	val, ok := v.(int64)
-	if !ok {
-		return ErrInvalidValueType
-	}
-	c.value = val
-	return nil
-}
