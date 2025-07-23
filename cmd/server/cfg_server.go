@@ -16,7 +16,8 @@ import (
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase"
+	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/server"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/ping"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -118,9 +119,16 @@ func startServer(ctx context.Context, opts *config.Options) error {
 		}
 	}()
 
-	metricUsecase := usecase.NewMetricUsecase(collector)
+	metricUsecase := srvUsecase.NewMetricUsecase(collector)
 
-	r := router.NewRouter(server.NewServer(metricUsecase, opts))
+	var pingUsecase *ping.PingUsecase
+	if pinger, ok := collector.(ping.Pinger); ok {
+		pingUsecase = ping.NewPingUsecase(pinger)
+	} else {
+		pingUsecase = nil
+	}
+
+	r := router.NewRouter(server.NewServer(metricUsecase, pingUsecase))
 
 	srv := &http.Server{
 		Addr:    opts.EndPointAddr,

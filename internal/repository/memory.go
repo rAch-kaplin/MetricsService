@@ -90,10 +90,6 @@ func (ms *MemStorage) GetAllMetrics(_ context.Context) ([]models.Metric, error) 
 	return result, nil
 }
 
-func (ms *MemStorage) Ping(ctx context.Context) error {
-	return nil
-}
-
 func (ms *MemStorage) Close() error {
 	return nil
 }

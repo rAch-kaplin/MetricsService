@@ -13,12 +13,21 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/mailru/easyjson"
 
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/agent"
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
+
+type Agent struct {
+	Usecase *agent.AgentUsecase
+}
+
+func NewAgent(uc *agent.AgentUsecase) *Agent {
+	return &Agent{Usecase: uc}
+}
 
 func UpdateAllMetrics(ctx context.Context, storage col.Collector) {
 	var memStats runtime.MemStats
@@ -47,15 +56,15 @@ func UpdateAllMetrics(ctx context.Context, storage col.Collector) {
 	}
 }
 
-func (uc *AgentUsecase) SendAllMetrics(ctx context.Context, client *resty.Client) {
-	allMetrics, err := uc.GetAllMetrics(ctx)
+func (auc *Agent) SendAllMetrics(ctx context.Context, client *resty.Client) {
+	allMetrics, err := auc.Usecase.GetAllMetrics(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to Get metrics")
 	}
 
 	log.Debug().Msgf("send all metrics: got %d metrics", len(allMetrics))
 	for _, metric := range allMetrics {
-		jsonMetric, err := uc.GetMetricJSON(ctx, metric)
+		jsonMetric, err := auc.Usecase.GetMetricJSON(ctx, metric)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to get json metric")
 		}

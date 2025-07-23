@@ -14,7 +14,7 @@ import (
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase"
+	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/server"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,8 +30,8 @@ func TestUpdateMetric(t *testing.T) {
 		opt(opts)
 	}
 
-	metricUsecase := usecase.NewMetricUsecase(repo.NewMemStorage())
-	router := router.NewRouter(server.NewServer(metricUsecase, opts))
+	metricUsecase := srvUsecase.NewMetricUsecase(repo.NewMemStorage())
+	router := router.NewRouter(server.NewServer(metricUsecase, nil))
 
 	tests := []struct {
 		name       string
@@ -118,8 +118,8 @@ func TestGetMetric(t *testing.T) {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 
-	metricUsecase := usecase.NewMetricUsecase(storage)
-	router := router.NewRouter(server.NewServer(metricUsecase, opts))
+	metricUsecase := srvUsecase.NewMetricUsecase(storage)
+	router := router.NewRouter(server.NewServer(metricUsecase, nil))
 
 	tests := []struct {
 		name       string

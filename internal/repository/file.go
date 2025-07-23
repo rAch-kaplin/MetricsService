@@ -121,10 +121,6 @@ func (fs *FileStorage) GetAllMetrics(ctx context.Context) ([]models.Metric, erro
 	return metrics, nil
 }
 
-func (fs *FileStorage) Ping(ctx context.Context) error {
-	return nil
-}
-
 func (fs *FileStorage) Close() error {
 	fs.wg.Wait()
 	return nil

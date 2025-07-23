@@ -11,20 +11,22 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/mailru/easyjson"
 
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase"
+	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/server"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/ping"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
 type Server struct {
-	Usecase *usecase.MetricUsecase
+	Usecase     *srvUsecase.MetricUsecase
+	PingUsecase *ping.PingUsecase
 }
 
-func NewServer(uc *usecase.MetricUsecase, opts *config.Options) *Server {
+func NewServer(uc *srvUsecase.MetricUsecase, puc *ping.PingUsecase) *Server {
 	return &Server{
-		Usecase: uc,
+		Usecase:     uc,
+		PingUsecase: puc,
 	}
 }
 
@@ -292,7 +294,7 @@ func (srv *Server) UpdatesMetricsHandlerJSON() http.HandlerFunc {
 
 func (srv *Server) PingHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := srv.Usecase.Ping(r.Context()); err != nil {
+		if err := srv.PingUsecase.Check(r.Context()); err != nil {
 			log.Error().Err(err).Msg("failed ping")
 			http.Error(w, "can't ping DB", http.StatusInternalServerError)
 			return

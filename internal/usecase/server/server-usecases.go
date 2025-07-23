@@ -1,4 +1,4 @@
-package usecase
+package server
 
 import (
 	"context"
@@ -89,9 +89,3 @@ func (uc *MetricUsecase) UpdateMetricList(ctx context.Context, metrics []models.
 	return nil
 }
 
-func (uc *MetricUsecase) Ping(ctx context.Context) error {
-	if err := uc.repo.Ping(ctx); err != nil {
-		return fmt.Errorf("failed ping database: %w", err)
-	}
-	return nil
-}

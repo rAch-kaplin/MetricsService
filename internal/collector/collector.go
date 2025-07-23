@@ -11,6 +11,5 @@ type Collector interface {
 	GetAllMetrics(ctx context.Context) ([]models.Metric, error)
 	UpdateMetric(ctx context.Context, mType, mName string, mValue any) error
 
-	Ping(ctx context.Context) error
 	Close() error
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/agent"
+	auc "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/agent"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
@@ -109,7 +110,7 @@ func init() {
 
 func startAgent(ctx context.Context) {
 	metricStorage := repo.NewMemStorage()
-	agentUsecase := agent.NewAgentUsecase(metricStorage)
+	agentUsecase := agent.NewAgent(&auc.AgentUsecase{Storage: metricStorage})
 
 	client := resty.New().
 		SetTimeout(5 * time.Second).
