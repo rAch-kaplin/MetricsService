@@ -14,7 +14,7 @@ import (
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
-	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/server"
+	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,7 +30,8 @@ func TestUpdateMetric(t *testing.T) {
 		opt(opts)
 	}
 
-	metricUsecase := srvUsecase.NewMetricUsecase(repo.NewMemStorage())
+	storage := repo.NewMemStorage()
+	metricUsecase := srvUsecase.NewMetricUsecase(storage, storage, storage)
 	router := router.NewRouter(server.NewServer(metricUsecase, nil))
 
 	tests := []struct {
@@ -90,7 +91,7 @@ func TestUpdateMetric(t *testing.T) {
 
 			router.ServeHTTP(rr, req)
 
-			assert.Equal(t, tt.wantStatus, rr.Code, "Test %s: expected status %d, got %d", tt.name, tt.wantStatus, rr.Code)
+			assert.Equal(t, tt.wantStatus, rr.Code)
 		})
 	}
 }
@@ -118,7 +119,7 @@ func TestGetMetric(t *testing.T) {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 
-	metricUsecase := srvUsecase.NewMetricUsecase(storage)
+	metricUsecase := srvUsecase.NewMetricUsecase(storage, storage, storage)
 	router := router.NewRouter(server.NewServer(metricUsecase, nil))
 
 	tests := []struct {
@@ -166,9 +167,9 @@ func TestGetMetric(t *testing.T) {
 
 			router.ServeHTTP(rr, req)
 
-			assert.Equal(t, tt.wantStatus, rr.Code, "Test %s: expected status %d, got %d", tt.name, tt.wantStatus, rr.Code)
+			assert.Equal(t, tt.wantStatus, rr.Code)
 			body, _ := io.ReadAll(rr.Body)
-			assert.Equal(t, tt.wantBody, string(body), "Test %s: expected body %q, got %q", tt.name, tt.wantBody, string(body))
+			assert.Equal(t, tt.wantBody, string(body))
 		})
 	}
 }

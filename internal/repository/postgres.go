@@ -8,7 +8,6 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
-	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	errH "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/errors-handlers"
 	"github.com/rs/zerolog/log"
@@ -18,7 +17,7 @@ type Database struct {
 	DB *sql.DB
 }
 
-func NewDatabase(ctx context.Context, dataBaseDSN string) (col.Collector, error) {
+func NewDatabase(ctx context.Context, dataBaseDSN string) (*Database, error) {
 	log.Info().Msgf("DSN: %s", dataBaseDSN)
 	db, err := sql.Open("pgx", dataBaseDSN)
 	if err != nil {
@@ -219,6 +218,16 @@ func (db *Database) UpdateMetric(ctx context.Context, mType, mName string, mValu
 	}
 
 	return tx.Commit()
+}
+
+func (db *Database) UpdateMetricList(ctx context.Context, metrics []models.Metric) error {
+	for _, metric := range metrics {
+		if err := db.UpdateMetric(ctx, metric.Type(), metric.Name(), metric.Value()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (db *Database) Ping(ctx context.Context) error {

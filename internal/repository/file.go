@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/files"
 	"github.com/rs/zerolog/log"
@@ -18,7 +17,7 @@ type FileStorage struct {
 	mutex      sync.RWMutex
 	wg         sync.WaitGroup
 	filePath   string
-	storage    col.Collector
+	storage    *MemStorage
 	SyncRecord bool
 }
 
@@ -37,7 +36,7 @@ func (fs *FileStorage) save(ctx context.Context) {
 	}
 }
 
-func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) {
+func NewFileStorage(ctx context.Context, fp *FileParams) (*FileStorage, error) {
 	fs := &FileStorage{
 		wg:         sync.WaitGroup{},
 		filePath:   fp.FileStoragePath,
@@ -94,6 +93,15 @@ func (fs *FileStorage) UpdateMetric(ctx context.Context, mType, mName string, mV
 		Str("type", mType).
 		Str("name", mName).
 		Msg("Metric updated successfully")
+
+	return nil
+}
+
+func (fs *FileStorage) UpdateMetricList(ctx context.Context, metrics []models.Metric) error {
+	if err := fs.storage.UpdateMetricList(ctx, metrics); err != nil {
+		log.Error().Err(err).Msg("failed update metric list from file storage")
+		return fmt.Errorf("failed update metric list from file storage %w", err)
+	}
 
 	return nil
 }

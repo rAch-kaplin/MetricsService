@@ -11,22 +11,22 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/mailru/easyjson"
 
-	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/server"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/ping"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/ping"
+	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
 type Server struct {
-	Usecase     *srvUsecase.MetricUsecase
-	PingUsecase *ping.PingUsecase
+	MetricUsecase *srvUsecase.MetricUsecase
+	PingUsecase   *ping.PingUsecase
 }
 
 func NewServer(uc *srvUsecase.MetricUsecase, puc *ping.PingUsecase) *Server {
 	return &Server{
-		Usecase:     uc,
-		PingUsecase: puc,
+		MetricUsecase: uc,
+		PingUsecase:   puc,
 	}
 }
 
@@ -35,7 +35,7 @@ func (srv *Server) GetMetric() http.HandlerFunc {
 		mType := chi.URLParam(req, "mType")
 		mName := chi.URLParam(req, "mName")
 
-		metric, err := srv.Usecase.GetMetric(req.Context(), mType, mName)
+		metric, err := srv.MetricUsecase.GetMetric(req.Context(), mType, mName)
 		if err != nil {
 			log.Error().Err(err).Msg("can't get valid metric")
 			http.Error(res, fmt.Sprintf("Metric %s was not found", mName), http.StatusNotFound)
@@ -66,10 +66,17 @@ func (srv *Server) GetMetric() http.HandlerFunc {
 
 func (srv *Server) GetAllMetrics() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		metricsToTable, err := srv.Usecase.GetAllMetrics(req.Context())
+		metrics, err := srv.MetricUsecase.GetAllMetrics(req.Context())
 		if err != nil {
 			log.Error().Err(err).Msg("failed to Get metrics")
 			http.Error(res, "failed to get metrics", http.StatusNotFound)
+			return
+		}
+
+		metricsToTable, err := converter.ConvertToMetricTable(metrics)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to convert metrics to table")
+			http.Error(res, "failed to convert metrics to table", http.StatusInternalServerError)
 			return
 		}
 
@@ -145,7 +152,7 @@ func (srv *Server) UpdateMetric() http.HandlerFunc {
 			return
 		}
 
-		if err := srv.Usecase.UpdateMetric(req.Context(), mType, mName, val); err != nil {
+		if err := srv.MetricUsecase.UpdateMetric(req.Context(), mType, mName, val); err != nil {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -174,7 +181,7 @@ func (srv *Server) GetMetricsHandlerJSON() http.HandlerFunc {
 		}
 
 		log.Debug().Str("type", jsonMetric.MType).Str("name", jsonMetric.ID).Msg("")
-		metric, err := srv.Usecase.GetMetric(req.Context(), jsonMetric.MType, jsonMetric.ID)
+		metric, err := srv.MetricUsecase.GetMetric(req.Context(), jsonMetric.MType, jsonMetric.ID)
 		if err != nil {
 			log.Error().Err(err).Msg("can't get valid metric")
 			http.Error(resp, "can't get valid metric", http.StatusNotFound)
@@ -235,12 +242,12 @@ func (srv *Server) UpdateMetricsHandlerJSON() http.HandlerFunc {
 			return
 		}
 
-		if err := srv.Usecase.UpdateMetric(req.Context(), jsonMetric.MType, jsonMetric.ID, value); err != nil {
+		if err := srv.MetricUsecase.UpdateMetric(req.Context(), jsonMetric.MType, jsonMetric.ID, value); err != nil {
 			http.Error(resp, fmt.Sprintf("invalid update metric %s: %v", jsonMetric.ID, err), http.StatusBadRequest)
 			return
 		}
 
-		newMetric, err := srv.Usecase.GetMetric(req.Context(), jsonMetric.MType, jsonMetric.ID)
+		newMetric, err := srv.MetricUsecase.GetMetric(req.Context(), jsonMetric.MType, jsonMetric.ID)
 		if err != nil {
 			log.Error().Err(err).Msg("can't get new value metric")
 			http.Error(resp, "can't get new value metric", http.StatusNotFound)
@@ -263,6 +270,23 @@ func (srv *Server) UpdateMetricsHandlerJSON() http.HandlerFunc {
 
 func (srv *Server) UpdatesMetricsHandlerJSON() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		var reader io.Reader
+		if req.Header.Get("Content-Encoding") == "gzip" {
+			gz, err := gzip.NewReader(req.Body)
+			if err != nil {
+				http.Error(w, "failed to create gzip reader", http.StatusBadRequest)
+				return
+			}
+			defer func() {
+				if err := gz.Close(); err != nil {
+					log.Error().Err(err).Msg("failed close gz reader")
+				}
+			}()
+			reader = gz
+		} else {
+			reader = req.Body
+		}
+
 		var jsonMetrics serialize.MetricsList
 
 		log.Info().Msg("UpdatesMetricsHandlerJSON called")
@@ -271,7 +295,7 @@ func (srv *Server) UpdatesMetricsHandlerJSON() http.HandlerFunc {
 			return
 		}
 
-		if err := easyjson.UnmarshalFromReader(req.Body, &jsonMetrics); err != nil {
+		if err := easyjson.UnmarshalFromReader(reader, &jsonMetrics); err != nil {
 			http.Error(w, fmt.Sprintf("invalid json body: %v", err), http.StatusBadRequest)
 			return
 		}
@@ -282,7 +306,7 @@ func (srv *Server) UpdatesMetricsHandlerJSON() http.HandlerFunc {
 			return
 		}
 
-		if err := srv.Usecase.UpdateMetricList(req.Context(), metrics); err != nil {
+		if err := srv.MetricUsecase.UpdateMetricList(req.Context(), metrics); err != nil {
 			log.Error().Err(err).Msg("failed update metrics")
 			http.Error(w, fmt.Sprintf("failed update metrics: %v", err), http.StatusInternalServerError)
 			return

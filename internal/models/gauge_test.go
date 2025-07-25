@@ -53,11 +53,11 @@ func TestGaugeUpdate(t *testing.T) {
 			g := models.NewGauge(tt.fields.name, tt.fields.value)
 			err := g.Update(tt.args.mValue)
 			if tt.wantErr {
-				require.Error(t, err, "gauge.Update() error = %v, wantErr = %v", err, tt.wantErr)
+				require.Error(t, err)
 			} else {
-				require.NoError(t, err, "gauge.Update() error = %v, wantErr = %v", err, tt.wantErr)
+				require.NoError(t, err)
 			}
-			assert.Equal(t, tt.want, g.Value(), "gauge.value = %v, want %v", g.Value(), tt.want)
+			assert.Equal(t, tt.want, g.Value())
 		})
 	}
 }

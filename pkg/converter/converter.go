@@ -28,6 +28,46 @@ func ConvertByType(mType, mValue string) (any, error) {
 	}
 }
 
+func ConvertToMetricTable(src []models.Metric) ([]models.MetricTable, error) {
+	converted := make([]models.MetricTable, 0, len(src))
+
+	for _, metric := range src {
+		var valStr string
+		mName := metric.Name()
+		mType := metric.Type()
+
+		switch mType {
+		case models.GaugeType:
+			val, ok := metric.Value().(float64)
+			if !ok {
+				log.Error().Str("metric_name", mName).Str("metric_type", mType).
+					Msg("Invalid metric value type")
+
+				return nil, fmt.Errorf("invalid metric value type: %s", mType)
+			}
+			valStr = strconv.FormatFloat(val, 'f', -1, 64)
+
+		case models.CounterType:
+			val, ok := metric.Value().(int64)
+			if !ok {
+				log.Error().Str("metric_name", mName).Str("metric_type", mType).
+					Msg("Invalid metric value type")
+
+				return nil, fmt.Errorf("invalid metric value type: %s", mType)
+			}
+			valStr = strconv.FormatInt(val, 10)
+		}
+
+		converted = append(converted, models.MetricTable{
+			Name:  mName,
+			Type:  mType,
+			Value: valStr,
+		})
+	}
+
+	return converted, nil
+}
+
 func ConvertMetrics(src serialize.MetricsList) ([]models.Metric, error) {
 	converted := make([]models.Metric, 0, len(src))
 
@@ -99,13 +139,12 @@ func сonvertToSerialization(src models.Metric) (serialize.Metric, error) {
 	return converted, nil
 }
 
-func ConverToSerialization(src []models.Metric) ([]serialize.Metric, error) {
+func ConvertToSerialization(src []models.Metric) ([]serialize.Metric, error) {
 	converted := make([]serialize.Metric, 0, len(src))
 
 	for _, mtr := range src {
 		metric, err := сonvertToSerialization(mtr)
 		if err != nil {
-			log.Error().Err(err).Msg("failed convert metric")
 			return nil, fmt.Errorf("metric failed convert %+v", mtr)
 		}
 

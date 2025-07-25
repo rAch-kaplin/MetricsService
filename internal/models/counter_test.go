@@ -77,11 +77,11 @@ func TestCounterUpdate(t *testing.T) {
 			c := models.NewCounter(tt.fields.name, tt.fields.value)
 			err := c.Update(tt.args.mValue)
 			if tt.wantErr {
-				require.Error(t, err, "Update() error = %v, wantErr = %v", err, tt.wantErr)
+				require.Error(t, err)
 			} else {
-				require.NoError(t, err, "Update() error = %v, wantErr = %v", err, tt.wantErr)
+				require.NoError(t, err)
 			}
-			assert.Equal(t, tt.wantValue, c.Value(), "Update() value = %v, wantValue = %v", c.Value(), tt.wantValue)
+			assert.Equal(t, tt.wantValue, c.Value())
 		})
 	}
 }

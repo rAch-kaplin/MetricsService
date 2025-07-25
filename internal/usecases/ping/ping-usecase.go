@@ -4,14 +4,6 @@ import (
 	"context"
 )
 
-type Pinger interface {
-	Ping(ctx context.Context) error
-}
-
-type Usecase interface {
-	Check(ctx context.Context) error
-}
-
 type PingUsecase struct {
 	pinger Pinger
 }

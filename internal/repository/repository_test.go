@@ -109,15 +109,15 @@ func TestMemStorage_UpdateMetric(t *testing.T) {
 
 			err := ms.UpdateMetric(ctx, tt.args.mType, tt.args.mName, tt.args.mValue)
 			if tt.wantErr {
-				require.Error(t, err, "MemStorage.UpdateMetric() error = %v, wantErr = %v", err, tt.wantErr)
+				require.Error(t, err)
 			} else {
-				require.NoError(t, err, "MemStorage.UpdateMetric() error = %v, wantErr = %v", err, tt.wantErr)
+				require.NoError(t, err)
 			}
 
 			if !tt.wantErr {
 				metric, err := ms.GetMetric(ctx, tt.args.mType, tt.args.mName)
-				require.NoError(t, err, "metric not found")
-				assert.Equal(t, tt.wantResult, metric.Value(), "got = %v, want = %v", metric.Value(), tt.wantResult)
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantResult, metric.Value())
 			}
 		})
 	}
@@ -190,10 +190,10 @@ func TestMemStorage_GetMetric(t *testing.T) {
 			metric, err := ms.GetMetric(ctx, tt.mType, tt.mName)
 
 			if tt.wantOk {
-				require.NoError(t, err, "GetMetric() error = %v, wantOk = %v", err, tt.wantOk)
-				assert.Equal(t, tt.wantVal, metric.Value(), "GetMetric() gotVal = %v, want %v", metric.Value(), tt.wantVal)
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantVal, metric.Value())
 			} else {
-				require.Error(t, err, "GetMetric() error = %v, wantOk = %v", err, tt.wantOk)
+				require.Error(t, err)
 			}
 		})
 	}
@@ -261,7 +261,7 @@ func TestMemStorage_GetAllMetrics(t *testing.T) {
 				gotMap[m.Name()] = m
 			}
 
-			assert.Equal(t, len(tt.want), len(gotMap), "wrong number of metrics: got %d, want %d", len(gotMap), len(tt.want))
+			assert.Equal(t, len(tt.want), len(gotMap))
 
 			for name, wantMetric := range tt.want {
 				gotMetric, ok := gotMap[name]
@@ -270,13 +270,13 @@ func TestMemStorage_GetAllMetrics(t *testing.T) {
 					continue
 				}
 
-				assert.Equal(t, wantMetric.Type(), gotMetric.Type(), "metric %s type mismatch: got %s, want %s", name, gotMetric.Type(), wantMetric.Type())
+				assert.Equal(t, wantMetric.Type(), gotMetric.Type())
 
 				switch wantMetric.Type() {
 				case models.CounterType:
-					assert.NotNil(t, gotMetric.Value(), "metric %s: expected counter delta, got nil", name)
+					assert.NotNil(t, gotMetric.Value())
 				case models.GaugeType:
-					assert.NotNil(t, gotMetric.Value(), "metric %s: expected gauge value, got nil", name)
+					assert.NotNil(t, gotMetric.Value())
 				default:
 					assert.Fail(t, "unknown metric type", "metric %s: unknown type %s", name, wantMetric.Type())
 				}

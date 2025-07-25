@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -15,9 +15,9 @@ type Params struct {
 	Opts *config.Options
 }
 
-func NewCollector(params *Params) (col.Collector, error) {
+func NewCollector(params *Params) (server.Collector, error) {
 	var (
-		collector col.Collector
+		collector server.Collector
 		err       error
 	)
 

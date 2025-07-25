@@ -21,13 +21,7 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-func (ms *MemStorage) UpdateMetric(_ context.Context, mType, mName string, mValue any) error {
-	ms.mutex.Lock()
-	defer ms.mutex.Unlock()
-	if mName == "" {
-		return models.ErrMetricsNotFound
-	}
-
+func updateMetric(ms *MemStorage, mType, mName string, mValue any) error {
 	if _, ok := ms.storage[mType]; !ok {
 		return models.ErrInvalidMetricsType
 	}
@@ -51,6 +45,26 @@ func (ms *MemStorage) UpdateMetric(_ context.Context, mType, mName string, mValu
 		return err
 	}
 	ms.storage[mType][mName] = newMetric
+	return nil
+}
+
+func (ms *MemStorage) UpdateMetric(_ context.Context, mType, mName string, mValue any) error {
+	ms.mutex.Lock()
+	defer ms.mutex.Unlock()
+
+	return updateMetric(ms, mType, mName, mValue)
+}
+
+func (ms *MemStorage) UpdateMetricList(_ context.Context, metrics []models.Metric) error {
+	ms.mutex.Lock()
+	defer ms.mutex.Unlock()
+
+	for _, metric := range metrics {
+		if err := updateMetric(ms, metric.Type(), metric.Name(), metric.Value()); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

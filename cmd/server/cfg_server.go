@@ -16,8 +16,8 @@ import (
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
-	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/server"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecase/ping"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/ping"
+	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -119,7 +119,7 @@ func startServer(ctx context.Context, opts *config.Options) error {
 		}
 	}()
 
-	metricUsecase := srvUsecase.NewMetricUsecase(collector)
+	metricUsecase := srvUsecase.NewMetricUsecase(collector, collector, collector)
 
 	var pingUsecase *ping.PingUsecase
 	if pinger, ok := collector.(ping.Pinger); ok {
