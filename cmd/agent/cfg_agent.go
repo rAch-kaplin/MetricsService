@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/agent"
-	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -86,7 +86,7 @@ var rootCmd = &cobra.Command{
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
-		go func(){
+		go func() {
 			<-stop
 			cancel()
 		}()
@@ -108,7 +108,7 @@ func init() {
 }
 
 func startAgent(ctx context.Context) {
-	storage := ms.NewMemStorage()
+	storage := storage.NewMemStorage()
 
 	client := resty.New().
 		SetTimeout(5 * time.Second).
@@ -128,9 +128,9 @@ func startAgent(ctx context.Context) {
 			return
 
 		case <-pollTimer.C:
-			agent.UpdateAllMetrics(storage)
+			agent.UpdateAllMetrics(ctx, storage)
 		case <-reportTimer.C:
-			agent.SendAllMetrics(client, storage)
+			agent.SendAllMetrics(ctx, client, storage)
 		}
 	}
 }

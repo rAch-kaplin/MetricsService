@@ -382,6 +382,7 @@ jobs:
 
       - name: "Code increment #11"
         if: |
+          github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter11' ||
           github.head_ref == 'iter12' ||
           github.head_ref == 'iter13' ||

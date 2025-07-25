@@ -12,7 +12,7 @@ import (
 var logger zerolog.Logger
 
 func InitLogger(logFilePath string) (*os.File, error) {
-	file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file %s: %w", logFilePath, err)
 	}
