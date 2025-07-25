@@ -254,7 +254,7 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			}
 			defer func() {
 				if err := gz.Close(); err != nil {
-					log.Error().Err(err).Msg("failed close gz reader")
+					log.Error().Err(err	).Msg("failed close gz reader")
 				}
 			}()
 			reader = gz
