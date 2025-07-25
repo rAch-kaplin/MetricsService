@@ -3,7 +3,6 @@ package metrics
 import (
 	"errors"
 )
-
 type Metric interface {
 	Value() any
 	Name() string
