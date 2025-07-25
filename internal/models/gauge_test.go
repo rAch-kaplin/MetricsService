@@ -1,6 +1,12 @@
-package metrics
+package models_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestGaugeUpdate(t *testing.T) {
 	type fields struct {
@@ -44,17 +50,14 @@ func TestGaugeUpdate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := &gauge{
-				name:  tt.fields.name,
-				value: tt.fields.value,
-			}
+			g := models.NewGauge(tt.fields.name, tt.fields.value)
 			err := g.Update(tt.args.mValue)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("gauge.Update() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
-			if !tt.wantErr && g.value != tt.want {
-				t.Errorf("gauge.value = %v, want %v", g.value, tt.want)
-			}
+			assert.Equal(t, tt.want, g.Value())
 		})
 	}
 }

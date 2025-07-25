@@ -36,5 +36,4 @@ logFileAgent.log
 cmd/server/server
 cmd/agent/agent
 
-tmp
 log.txt

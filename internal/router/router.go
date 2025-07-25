@@ -5,36 +5,34 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 )
 
-func NewRouter(storage col.Collector, opts *config.Options) http.Handler {
+func NewRouter(srv *server.Server) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(server.WithLogging)
 	r.Use(server.WithGzipCompress)
 
 	r.Route("/", func(r chi.Router) {
-		r.Get("/", server.GetAllMetrics(storage))
+		r.Get("/", srv.GetAllMetrics())
 		r.Route("/update", func(r chi.Router) {
 
-			r.Post("/", server.UpdateMetricsHandlerJSON(storage))
-			r.Post("/{mType}/{mName}/{mValue}", server.UpdateMetric(storage))
+			r.Post("/", srv.UpdateMetricsHandlerJSON())
+			r.Post("/{mType}/{mName}/{mValue}", srv.UpdateMetric())
 		})
 
 		r.Route("/value", func(r chi.Router) {
-			r.Post("/", server.GetMetricsHandlerJSON(storage))
-			r.Get("/{mType}/{mName}", server.GetMetric(storage))
+			r.Post("/", srv.GetMetricsHandlerJSON())
+			r.Get("/{mType}/{mName}", srv.GetMetric())
 		})
 
 		r.Route("/ping", func(r chi.Router) {
-			r.Get("/", server.PingHandler(storage))
+			r.Get("/", srv.PingHandler())
 		})
 
 		r.Route("/updates", func(r chi.Router) {
-			r.Post("/", server.UpdatesMetricsHandlerJSON(storage))
+			r.Post("/", srv.UpdatesMetricsHandlerJSON())
 		})
 	})
 

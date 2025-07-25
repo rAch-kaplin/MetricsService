@@ -1,7 +1,7 @@
 package serialization
 
 import (
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -18,48 +18,48 @@ type MetricsList []Metric
 
 func (mtr *Metric) SetValue(value any) error {
 	switch mtr.MType {
-	case metrics.GaugeType:
+	case models.GaugeType:
 		val, ok := value.(float64)
 		if !ok {
 			log.Error().Msg("not value type of value")
-			return metrics.ErrInvalidValueType
+			return models.ErrInvalidValueType
 		}
 
 		mtr.Value = &val
 		return nil
 
-	case metrics.CounterType:
+	case models.CounterType:
 		val, ok := value.(int64)
 		if !ok {
 			log.Error().Msg("not value type of value")
-			return metrics.ErrInvalidValueType
+			return models.ErrInvalidValueType
 		}
 
 		mtr.Delta = &val
 		return nil
 
 	default:
-		return metrics.ErrInvalidMetricsType
+		return models.ErrInvalidMetricsType
 	}
 }
 
 func (mtr *Metric) GetValue() (any, error) {
 	switch mtr.MType {
-	case metrics.GaugeType:
+	case models.GaugeType:
 		if mtr.Value == nil {
-			return nil, metrics.ErrMetricsNotFound
+			return nil, models.ErrMetricsNotFound
 		}
 
 		return *mtr.Value, nil
 
-	case metrics.CounterType:
+	case models.CounterType:
 		if mtr.Delta == nil {
-			return nil, metrics.ErrMetricsNotFound
+			return nil, models.ErrMetricsNotFound
 		}
 
 		return *mtr.Delta, nil
 
 	default:
-		return nil, metrics.ErrInvalidMetricsType
+		return nil, models.ErrInvalidMetricsType
 	}
 }

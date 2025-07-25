@@ -13,14 +13,23 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/mailru/easyjson"
 
-	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/agent"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
-func UpdateAllMetrics(ctx context.Context, storage *storage.MemStorage) {
+type Agent struct {
+	Usecase *agent.AgentUsecase
+}
+
+func NewAgent(uc *agent.AgentUsecase) *Agent {
+	return &Agent{Usecase: uc}
+}
+
+func UpdateAllMetrics(ctx context.Context, storage agent.MetricUpdater) {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
@@ -38,61 +47,42 @@ func UpdateAllMetrics(ctx context.Context, storage *storage.MemStorage) {
 		log.Debug().Msgf("update metric %s", stat.Name)
 	}
 
-	if err := storage.UpdateMetric(ctx, mtr.CounterType, "PollCount", int64(1)); err != nil {
+	if err := storage.UpdateMetric(ctx, models.CounterType, "PollCount", int64(1)); err != nil {
 		log.Error().Msgf("Failed to update PollCount metric: %v", err)
 	}
 
-	if err := storage.UpdateMetric(ctx, mtr.GaugeType, "RandomValue", rand.Float64()); err != nil {
+	if err := storage.UpdateMetric(ctx, models.GaugeType, "RandomValue", rand.Float64()); err != nil {
 		log.Error().Msgf("Failed to update RandomValue metric: %v", err)
 	}
 }
 
-func SendAllMetrics(ctx context.Context, client *resty.Client, storage *storage.MemStorage) {
-	allMetrics := storage.GetAllMetrics(ctx)
-
-	for _, metric := range allMetrics {
-		mType := metric.Type()
-		mName := metric.Name()
-
-		metricJSON := serialize.Metric{
-			ID:    mName,
-			MType: mType,
-		}
-
-		switch mType {
-		case mtr.GaugeType:
-			val, ok := metric.Value().(float64)
-			if !ok {
-				log.Error().Str("metric_name", mName).Str("metric_type", mType).
-					Msg("Invalid metric value type")
-				continue
-			}
-
-			metricJSON.Value = &val
-			sendMetric(client, &metricJSON)
-
-		case mtr.CounterType:
-			val, ok := metric.Value().(int64)
-			if !ok {
-				log.Error().Str("metric_name", mName).Str("metric_type", mType).
-					Msg("Invalid metric value type")
-				continue
-			}
-
-			metricJSON.Delta = &val
-			sendMetric(client, &metricJSON)
-		}
+func (ag *Agent) SendAllMetrics(ctx context.Context, client *resty.Client) {
+	allMetrics, err := ag.Usecase.GetAllMetrics(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to Get metrics")
 	}
+
+	metricsToSend, err := converter.ConvertToSerialization(allMetrics)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert metrics to serialization")
+	}
+
+	if len(metricsToSend) > 0 {
+		sendBatch(client, metricsToSend)
+	}
+
+	log.Info().Int("count", len(metricsToSend)).Msg("Sending metrics batch")
 }
 
-func sendMetric(client *resty.Client, metricJSON *serialize.Metric) {
+func sendBatch(client *resty.Client, metrics []serialize.Metric) {
 	backoffSchedule := []time.Duration{
 		100 * time.Millisecond,
 		500 * time.Millisecond,
 		1 * time.Second,
 	}
 
-	buf, ok, err := ConvertToGzipData(metricJSON)
+	log.Debug().Msg("sendMetric")
+	buf, ok, err := ConvertToGzipData(metrics)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to convert metric to gzip")
 		return
@@ -107,7 +97,7 @@ func sendMetric(client *resty.Client, metricJSON *serialize.Metric) {
 			req.SetHeader("Content-Encoding", "gzip")
 		}
 
-		res, err := req.Post("update/")
+		res, err := req.Post("updates/")
 
 		if err != nil || res.StatusCode() != http.StatusOK {
 		} else {
@@ -118,19 +108,20 @@ func sendMetric(client *resty.Client, metricJSON *serialize.Metric) {
 	}
 }
 
-func ConvertToGzipData(metricJSON *serialize.Metric) (*bytes.Buffer, bool, error) {
-	jsonData, err := easyjson.Marshal(*metricJSON)
+func ConvertToGzipData(metrics serialize.MetricsList) (*bytes.Buffer, bool, error) {
+	var jsonBuf bytes.Buffer
+
+	_, err := easyjson.MarshalToWriter(metrics, &jsonBuf)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to marshal metricJSON")
+		log.Error().Err(err).Msg("Failed to marshal metrics")
 		return nil, false, err
 	}
 
-	var buf bytes.Buffer
-	if len(jsonData) <= 1024 {
-		buf.Write(jsonData)
-		return &buf, false, nil
+	if jsonBuf.Len() <= 1024 {
+		return &jsonBuf, false, nil
 	}
 
+	var buf bytes.Buffer
 	gz, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create gzip writer")
@@ -143,7 +134,7 @@ func ConvertToGzipData(metricJSON *serialize.Metric) (*bytes.Buffer, bool, error
 		}
 	}()
 
-	_, err = gz.Write(jsonData)
+	_, err = gz.Write(jsonBuf.Bytes())
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to write gzip data")
 		return nil, false, err

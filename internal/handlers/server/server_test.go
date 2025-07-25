@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"context"
-	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,10 +10,13 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
-	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
+	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUpdateMetric(t *testing.T) {
@@ -28,20 +30,9 @@ func TestUpdateMetric(t *testing.T) {
 		opt(opts)
 	}
 
-	//FIXME
-	db, err := sql.Open("pgx", opts.DataBaseDSN)
-	if err != nil {
-		log.Error().Err(err).Msg("sql.Open error")
-		panic(err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Error().Err(err).Msg("Failed to db.Close")
-		}
-	}()
-
-	storage := storage.NewMemStorage()
-	router := router.NewRouter(storage, opts)
+	storage := repo.NewMemStorage()
+	metricUsecase := srvUsecase.NewMetricUsecase(storage, storage, storage)
+	router := router.NewRouter(server.NewServer(metricUsecase, nil))
 
 	tests := []struct {
 		name       string
@@ -100,9 +91,7 @@ func TestUpdateMetric(t *testing.T) {
 
 			router.ServeHTTP(rr, req)
 
-			if rr.Code != tt.wantStatus {
-				t.Errorf("Test %s: expected status %d, got %d", tt.name, tt.wantStatus, rr.Code)
-			}
+			assert.Equal(t, tt.wantStatus, rr.Code)
 		})
 	}
 }
@@ -118,31 +107,20 @@ func TestGetMetric(t *testing.T) {
 		opt(opts)
 	}
 
-	//FIXME
-	db, err := sql.Open("pgx", opts.DataBaseDSN)
-	if err != nil {
-		log.Error().Err(err).Msg("sql.Open error")
-		panic(err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Error().Err(err).Msg("Failed to db.Close")
-		}
-	}()
-
 	//FIXME - maybe need mocks
 	ctx := context.Background()
-	storage := storage.NewMemStorage()
+	storage := repo.NewMemStorage()
 
-	if err := storage.UpdateMetric(ctx, mtr.GaugeType, "cpu_usage", 75.5); err != nil {
+	if err := storage.UpdateMetric(ctx, models.GaugeType, "cpu_usage", 75.5); err != nil {
 		log.Error().Msgf("Failed to update metric cpu_usage: %v", err)
 	}
 
-	if err := storage.UpdateMetric(ctx, mtr.CounterType, "requests_total", int64(100)); err != nil {
+	if err := storage.UpdateMetric(ctx, models.CounterType, "requests_total", int64(100)); err != nil {
 		log.Error().Msgf("Failed to update metric requests_total: %v", err)
 	}
 
-	router := router.NewRouter(storage, opts)
+	metricUsecase := srvUsecase.NewMetricUsecase(storage, storage, storage)
+	router := router.NewRouter(server.NewServer(metricUsecase, nil))
 
 	tests := []struct {
 		name       string
@@ -189,13 +167,9 @@ func TestGetMetric(t *testing.T) {
 
 			router.ServeHTTP(rr, req)
 
-			if rr.Code != tt.wantStatus {
-				t.Errorf("Test %s: expected status %d, got %d", tt.name, tt.wantStatus, rr.Code)
-			}
+			assert.Equal(t, tt.wantStatus, rr.Code)
 			body, _ := io.ReadAll(rr.Body)
-			if string(body) != tt.wantBody {
-				t.Errorf("Test %s: expected body %q, got %q", tt.name, tt.wantBody, string(body))
-			}
+			assert.Equal(t, tt.wantBody, string(body))
 		})
 	}
 }

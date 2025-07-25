@@ -12,10 +12,12 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/spf13/cobra"
 
-	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
+	colcfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector/config"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
-	storage "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/storage"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/ping"
+	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
@@ -33,8 +35,8 @@ var rootCmd = &cobra.Command{
 	Short:   "MetricService",
 	Long:    "MetricService",
 	Args:    cobra.NoArgs,
-	PreRunE: PreRunE,
-	RunE:    RunE,
+	PreRunE: preRunE,
+	RunE:    runE,
 }
 
 func init() {
@@ -45,7 +47,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&dataBaseDSN, "d", "d", config.DefaultDataBaseDSN, "database dsn")
 }
 
-func PreRunE(cmd *cobra.Command, args []string) error {
+func preRunE(cmd *cobra.Command, args []string) error {
 	var err error
 	opts, err = config.ParseOptionsFromCmdAndEnvs(cmd, &config.Options{
 		EndPointAddr:    endPointAddr,
@@ -65,7 +67,7 @@ func PreRunE(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func RunE(cmd *cobra.Command, args []string) error {
+func runE(cmd *cobra.Command, args []string) error {
 	logFile, err := log.InitLogger("logFileServer.log")
 	if err != nil {
 		return fmt.Errorf("logger init error: %w", err)
@@ -104,7 +106,10 @@ func startServer(ctx context.Context, opts *config.Options) error {
 		Str("address", opts.EndPointAddr).
 		Msg("Server configuration")
 
-	collector, err := ChoiceCollector(ctx, opts)
+	collector, err := colcfg.NewCollector(&colcfg.Params{
+		Ctx:  ctx,
+		Opts: opts,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create collector: %w", err)
 	}
@@ -114,7 +119,16 @@ func startServer(ctx context.Context, opts *config.Options) error {
 		}
 	}()
 
-	r := router.NewRouter(collector, opts)
+	metricUsecase := srvUsecase.NewMetricUsecase(collector, collector, collector)
+
+	var pingUsecase *ping.PingUsecase
+	if pinger, ok := collector.(ping.Pinger); ok {
+		pingUsecase = ping.NewPingUsecase(pinger)
+	} else {
+		pingUsecase = nil
+	}
+
+	r := router.NewRouter(server.NewServer(metricUsecase, pingUsecase))
 
 	srv := &http.Server{
 		Addr:    opts.EndPointAddr,
@@ -142,33 +156,3 @@ func startServer(ctx context.Context, opts *config.Options) error {
 	return nil
 }
 
-func ChoiceCollector(ctx context.Context, opts *config.Options) (col.Collector, error) {
-	var (
-		collector col.Collector
-		err       error
-	)
-
-	switch {
-	case opts.DataBaseDSN != "":
-		collector, err = storage.NewDatabase(ctx, opts.DataBaseDSN)
-		if err != nil {
-			return nil, fmt.Errorf("DB connection failed: %w", err)
-		}
-	case opts.FileStoragePath != "":
-		collector, err = storage.NewFileStorage(ctx, &storage.FileParams{
-			FileStoragePath: opts.FileStoragePath,
-			RestoreOnStart:  opts.RestoreOnStart,
-			StoreInterval:   opts.StoreInterval})
-
-		log.Debug().Msg("chose file storage")
-	default:
-		collector = storage.NewMemStorage()
-	}
-
-	if err != nil {
-		log.Error().Err(err).Msg("failed create storage")
-		return nil, err
-	}
-
-	return collector, nil
-}
