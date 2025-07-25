@@ -12,7 +12,6 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/mailru/easyjson"
 
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	ms "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/mem-storage"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
@@ -53,7 +52,7 @@ func SendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 		mType := metric.Type()
 		mName := metric.Name()
 
-		metricJSON := server.Metrics{
+		metricJSON := mtr.Metrics{
 			ID:    mName,
 			MType: mType,
 		}
@@ -84,7 +83,7 @@ func SendAllMetrics(client *resty.Client, storage *ms.MemStorage) {
 	}
 }
 
-func sendMetric(client *resty.Client, metricJSON *server.Metrics) {
+func sendMetric(client *resty.Client, metricJSON *mtr.Metrics) {
 	backoffSchedule := []time.Duration{
 		100 * time.Millisecond,
 		500 * time.Millisecond,
@@ -117,7 +116,7 @@ func sendMetric(client *resty.Client, metricJSON *server.Metrics) {
 	}
 }
 
-func ConvertToGzipData(metricJSON *server.Metrics) (*bytes.Buffer, bool, error) {
+func ConvertToGzipData(metricJSON *mtr.Metrics) (*bytes.Buffer, bool, error) {
 	jsonData, err := easyjson.Marshal(*metricJSON)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to marshal metricJSON")

@@ -16,19 +16,6 @@ import (
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
-type Metrics struct {
-	ID    string   `json:"id"`
-	MType string   `json:"type"`
-	Delta *int64   `json:"delta,omitempty"`
-	Value *float64 `json:"value,omitempty"`
-}
-
-type MetricTable struct {
-	Name  string
-	Type  string
-	Value string
-}
-
 func ConvertByType(mType, mValue string) (any, error) {
 	switch mType {
 	case mtr.GaugeType:
@@ -84,7 +71,7 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		allMetrics := storage.GetAllMetrics()
 
-		var metricsToTable []MetricTable
+		var metricsToTable []mtr.MetricTable
 
 		for _, metric := range allMetrics {
 			var valStr string
@@ -111,7 +98,7 @@ func GetAllMetrics(storage ms.Collector) http.HandlerFunc {
 				valStr = strconv.FormatInt(val, 10)
 			}
 
-			metricsToTable = append(metricsToTable, MetricTable{
+			metricsToTable = append(metricsToTable, mtr.MetricTable{
 				Name:  mName,
 				Type:  mType,
 				Value: valStr,
@@ -203,7 +190,7 @@ func UpdateMetric(storage ms.Collector) http.HandlerFunc {
 	}
 }
 
-func FillMetricValueFromStorage(storage ms.Collector, metric *Metrics) bool {
+func FillMetricValueFromStorage(storage ms.Collector, metric *mtr.Metrics) bool {
 	value, ok := storage.GetMetric(metric.MType, metric.ID)
 	if !ok {
 		return false
@@ -228,7 +215,7 @@ func FillMetricValueFromStorage(storage ms.Collector, metric *Metrics) bool {
 
 func GetMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
-		var metric Metrics
+		var metric mtr.Metrics
 
 		log.Info().Msg("GetMetricsHandlerJSON called\n\n")
 		if req.Header.Get("Content-Type") != "application/json" {
@@ -267,7 +254,7 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			}
 			defer func() {
 				if err := gz.Close(); err != nil {
-					log.Error().Err(err).Msg("failed close gz reader")
+					log.Error().Err(err	).Msg("failed close gz reader")
 				}
 			}()
 			reader = gz
@@ -275,7 +262,7 @@ func UpdateMetricsHandlerJSON(storage ms.Collector) http.HandlerFunc {
 			reader = req.Body
 		}
 
-		var metric Metrics
+		var metric mtr.Metrics
 
 		if req.Header.Get("Content-Type") != "application/json" {
 			http.Error(resp, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
