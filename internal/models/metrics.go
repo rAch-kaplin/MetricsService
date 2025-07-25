@@ -3,7 +3,6 @@ package models
 import (
 	"errors"
 )
-
 type Metric interface {
 	Value() any
 	Name() string

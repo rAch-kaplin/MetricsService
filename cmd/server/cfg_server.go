@@ -155,3 +155,4 @@ func startServer(ctx context.Context, opts *config.Options) error {
 
 	return nil
 }
+

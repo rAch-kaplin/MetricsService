@@ -463,7 +463,6 @@ jobs:
 
       - name: "Code increment #14"
         if: |
-          github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter14' ||
           github.head_ref == 'iter15' ||
           github.head_ref == 'iter16' ||
@@ -489,7 +488,6 @@ jobs:
 
       - name: "Code increment #14 (race detection)"
         if: |
-          github.ref == 'refs/heads/main' ||
           github.head_ref == 'iter14' ||
           github.head_ref == 'iter15' ||
           github.head_ref == 'iter16' ||
