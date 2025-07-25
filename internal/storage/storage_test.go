@@ -121,7 +121,7 @@ func TestMemStorage_UpdateMetric(t *testing.T) {
 
 func TestMemStorage_GetMetric(t *testing.T) {
 	ctx := context.Background()
-	
+
 	counter := mtr.NewCounter("requests", 42)
 	gauge := mtr.NewGauge("temperature", 36.6)
 

@@ -152,7 +152,7 @@ func ChoiceCollector(ctx context.Context, opts *config.Options) (col.Collector, 
 	case opts.DataBaseDSN != "":
 		collector, err = storage.NewDatabase(ctx, opts.DataBaseDSN)
 		if err != nil {
-            return nil, fmt.Errorf("DB connection failed: %w", err) 
+            return nil, fmt.Errorf("DB connection failed: %w", err)
         }
 	case opts.FileStoragePath != "":
 		collector, err = storage.NewFileStorage(ctx, &storage.FileParams{
