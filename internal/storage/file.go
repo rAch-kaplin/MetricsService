@@ -27,14 +27,27 @@ type FileParams struct {
 	StoreInterval   int
 }
 
+func (fs *FileStorage) save(ctx context.Context) {
+	fs.mutex.Lock()
+	defer fs.mutex.Unlock()
+
+	if err := database.SaveToDB(ctx, fs.storage, fs.filePath); err != nil {
+		log.Error().Err(err).Msg("failed to save DB")
+	}
+}
+
 func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) {
 	fs := &FileStorage{
 		filePath:   fp.FileStoragePath,
 		storage:    NewMemStorage(),
-		SyncRecord: false,
+		SyncRecord: fp.StoreInterval == 0,
 	}
 	if fp.RestoreOnStart {
-		if err := database.LoadFromDB(ctx, fs.storage, fp.FileStoragePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		fs.mutex.Lock()
+		err := database.LoadFromDB(ctx, fs.storage, fp.FileStoragePath)
+		fs.mutex.Unlock()
+
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("LoadFromDB error %w", err)
 		}
 	}
@@ -51,15 +64,10 @@ func NewFileStorage(ctx context.Context, fp *FileParams) (col.Collector, error) 
 			for {
 				select {
 				case <-ticker.C:
-					if err := database.SaveToDB(ctx, fs.storage, fp.FileStoragePath); err != nil {
-						log.Error().Err(err).Msg("failed to save DB")
-					}
+					fs.save(ctx)
 				case <-ctx.Done():
 					log.Info().Msg("Shutting down server, saving metrics")
-
-					if err := database.SaveToDB(ctx, fs.storage, fp.FileStoragePath); err != nil {
-						log.Error().Err(err).Msg("Failed to save metrics during shutdown")
-					}
+					fs.save(ctx)
 					return
 				}
 			}
@@ -93,20 +101,20 @@ func (fs *FileStorage) UpdateMetric(ctx context.Context, mType, mName string, mV
 	return nil
 }
 
-func (fs *FileStorage) GetMetric(ctx context.Context, mType, mName string) (any, bool) {
+func (fs *FileStorage) GetMetric(ctx context.Context, mType, mName string) (any, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
-	val, ok := fs.storage.GetMetric(ctx, mType, mName)
-	if !ok {
+	val, err := fs.storage.GetMetric(ctx, mType, mName)
+	if err != nil {
 		log.Error().
 			Str("type", mType).
 			Str("name", mName).
 			Msg("can't get valid metric")
-		return nil, false
+		return nil, fmt.Errorf("can't get valid metric: %v", err)
 	}
 
-	return val, true
+	return val, nil
 }
 
 func (fs *FileStorage) GetAllMetrics(ctx context.Context) []mtr.Metric {

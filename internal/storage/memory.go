@@ -54,15 +54,16 @@ func (ms *MemStorage) UpdateMetric(_ context.Context, mType, mName string, mValu
 	return nil
 }
 
-func (ms *MemStorage) GetMetric(_ context.Context, mType, mName string) (any, bool) {
+func (ms *MemStorage) GetMetric(_ context.Context, mType, mName string) (any, error) {
 	ms.mutex.RLock()
 	defer ms.mutex.RUnlock()
 
-	if metric, ok := ms.storage[mType][mName]; ok {
-		return metric.Value(), true
+	metric, ok := ms.storage[mType][mName]
+	if !ok {
+		return nil, mtr.ErrMetricsNotFound
 	}
 
-	return nil, false
+	return metric.Value(), nil
 }
 
 func (ms *MemStorage) GetAllMetrics(_ context.Context) []mtr.Metric {
@@ -85,7 +86,7 @@ func (ms *MemStorage) GetAllMetrics(_ context.Context) []mtr.Metric {
 }
 
 func (ms *MemStorage) Ping(ctx context.Context) error {
-    return nil
+	return nil
 }
 
 func (ms *MemStorage) Close() error {

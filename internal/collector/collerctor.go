@@ -7,7 +7,7 @@ import (
 )
 
 type Collector interface {
-	GetMetric(ctx context.Context, mType, mName string) (any, bool)
+	GetMetric(ctx context.Context, mType, mName string) (any, error)
 	GetAllMetrics(ctx context.Context) []mtr.Metric
 	UpdateMetric(ctx context.Context, mType, mName string, mValue any) error
 

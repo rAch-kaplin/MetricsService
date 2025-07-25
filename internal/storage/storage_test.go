@@ -106,8 +106,8 @@ func TestMemStorage_UpdateMetric(t *testing.T) {
 			}
 
 			if !tt.wantErr {
-				val, ok := ms.GetMetric(ctx, tt.args.mType, tt.args.mName)
-				if !ok {
+				val, err := ms.GetMetric(ctx, tt.args.mType, tt.args.mName)
+				if err != nil {
 					t.Errorf("metric not found")
 					return
 				}
@@ -179,12 +179,15 @@ func TestMemStorage_GetMetric(t *testing.T) {
 				mutex:   sync.RWMutex{},
 				storage: tt.fields,
 			}
-			gotVal, gotOk := ms.GetMetric(ctx, tt.mType, tt.mName)
-			if gotVal != tt.wantVal {
-				t.Errorf("GetMetric() gotVal = %v, want %v", gotVal, tt.wantVal)
+			gotVal, err := ms.GetMetric(ctx, tt.mType, tt.mName)
+
+			if (err == nil) != tt.wantOk {
+				t.Errorf("GetMetric() error = %v, wantOk = %v", err, tt.wantOk)
+				return
 			}
-			if gotOk != tt.wantOk {
-				t.Errorf("GetMetric() gotOk = %v, want %v", gotOk, tt.wantOk)
+
+			if tt.wantOk && gotVal != tt.wantVal {
+				t.Errorf("GetMetric() gotVal = %v, want %v", gotVal, tt.wantVal)
 			}
 		})
 	}

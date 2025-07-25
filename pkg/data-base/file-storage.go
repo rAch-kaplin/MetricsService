@@ -10,14 +10,15 @@ import (
 	col "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector"
 	mtr "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
+	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 )
 
 func SaveToDB(ctx context.Context, collector col.Collector, path string) error {
 	allMetrics := collector.GetAllMetrics(ctx)
-	data := make([]mtr.Metrics, 0, len(allMetrics))
+	data := make(serialize.MetricsList, 0, len(allMetrics))
 
 	for _, metric := range allMetrics {
-		var newMetric mtr.Metrics
+		var newMetric serialize.Metric
 		newMetric.MType = metric.Type()
 		newMetric.ID = metric.Name()
 
@@ -97,9 +98,10 @@ func LoadFromDB(ctx context.Context, collector col.Collector, path string) error
 
 	if len(bytes) == 0 {
 		log.Warn().Msgf("DB file %s is empty, skipping restore", path)
-		return nil
+		return os.ErrNotExist
 	}
-	var data []mtr.Metrics
+
+	var data serialize.MetricsList
 	err = json.Unmarshal(bytes, &data)
 	if err != nil {
 		return fmt.Errorf("can't parse json format from DB %w", err)
