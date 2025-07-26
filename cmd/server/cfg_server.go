@@ -12,8 +12,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/spf13/cobra"
 
-	colcfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/collector/config"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
+	colcfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/collector"
+	srvCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/ping"
@@ -27,7 +27,8 @@ var (
 	fileStoragePath string
 	restoreOnStart  bool
 	dataBaseDSN     string
-	opts            *config.Options
+	key             string
+	opts            *srvCfg.Options
 )
 
 var rootCmd = &cobra.Command{
@@ -40,28 +41,31 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&endPointAddr, "a", "a", config.DefaultEndpoint, "endpoint HTTP-server addr")
-	rootCmd.Flags().IntVarP(&storeInterval, "i", "i", config.DefaultStoreInterval, "store interval in seconds (0 = sync)")
-	rootCmd.Flags().StringVarP(&fileStoragePath, "f", "f", config.DefaultFileStoragePath, "file to store metrics")
-	rootCmd.Flags().BoolVarP(&restoreOnStart, "r", "r", config.DefaultRestoreOnStart, "restore metrics from file on start")
-	rootCmd.Flags().StringVarP(&dataBaseDSN, "d", "d", config.DefaultDataBaseDSN, "database dsn")
+	rootCmd.Flags().StringVarP(&endPointAddr, "a", "a", srvCfg.DefaultEndpoint, "endpoint HTTP-server addr")
+	rootCmd.Flags().IntVarP(&storeInterval, "i", "i", srvCfg.DefaultStoreInterval, "store interval in seconds (0 = sync)")
+	rootCmd.Flags().StringVarP(&fileStoragePath, "f", "f", srvCfg.DefaultFileStoragePath, "file to store metrics")
+	rootCmd.Flags().BoolVarP(&restoreOnStart, "r", "r", srvCfg.DefaultRestoreOnStart, "restore metrics from file on start")
+	rootCmd.Flags().StringVarP(&dataBaseDSN, "d", "d", srvCfg.DefaultDataBaseDSN, "database dsn")
+	rootCmd.Flags().StringVarP(&key, "k", "k", srvCfg.DefaultKey, "key for hash")
 }
 
 func preRunE(cmd *cobra.Command, args []string) error {
 	var err error
-	opts, err = config.ParseOptionsFromCmdAndEnvs(cmd, &config.Options{
+	opts, err = srvCfg.ParseOptionsFromCmdAndEnvs(cmd, &srvCfg.Options{
 		EndPointAddr:    endPointAddr,
 		StoreInterval:   storeInterval,
 		FileStoragePath: fileStoragePath,
 		RestoreOnStart:  restoreOnStart,
-		DataBaseDSN:     dataBaseDSN})
+		DataBaseDSN:     dataBaseDSN,
+		Key:             key,})
 
-	opts = config.NewServerOptions(
-		config.WithAddress(opts.EndPointAddr),
-		config.WithStoreInterval(opts.StoreInterval),
-		config.WithFileStoragePath(opts.FileStoragePath),
-		config.WithRestoreOnStart(opts.RestoreOnStart),
-		config.WithDataBaseDSN(opts.DataBaseDSN),
+	opts = srvCfg.NewServerOptions(
+		srvCfg.WithAddress(opts.EndPointAddr),
+		srvCfg.WithStoreInterval(opts.StoreInterval),
+		srvCfg.WithFileStoragePath(opts.FileStoragePath),
+		srvCfg.WithRestoreOnStart(opts.RestoreOnStart),
+		srvCfg.WithDataBaseDSN(opts.DataBaseDSN),
+		srvCfg.WithKey(opts.Key),
 	)
 
 	return err
@@ -101,7 +105,7 @@ func runE(cmd *cobra.Command, args []string) error {
 	}
 }
 
-func startServer(ctx context.Context, opts *config.Options) error {
+func startServer(ctx context.Context, opts *srvCfg.Options) error {
 	log.Info().
 		Str("address", opts.EndPointAddr).
 		Msg("Server configuration")
@@ -128,7 +132,7 @@ func startServer(ctx context.Context, opts *config.Options) error {
 		pingUsecase = nil
 	}
 
-	r := router.NewRouter(server.NewServer(metricUsecase, pingUsecase))
+	r := router.NewRouter(server.NewServer(metricUsecase, pingUsecase), opts)
 
 	srv := &http.Server{
 		Addr:    opts.EndPointAddr,
