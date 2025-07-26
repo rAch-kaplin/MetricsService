@@ -32,7 +32,7 @@ func TestUpdateMetric(t *testing.T) {
 
 	storage := repo.NewMemStorage()
 	metricUsecase := srvUsecase.NewMetricUsecase(storage, storage, storage)
-	router := router.NewRouter(server.NewServer(metricUsecase, nil))
+	router := router.NewRouter(server.NewServer(metricUsecase, nil), opts)
 
 	tests := []struct {
 		name       string
@@ -120,7 +120,7 @@ func TestGetMetric(t *testing.T) {
 	}
 
 	metricUsecase := srvUsecase.NewMetricUsecase(storage, storage, storage)
-	router := router.NewRouter(server.NewServer(metricUsecase, nil))
+	router := router.NewRouter(server.NewServer(metricUsecase, nil), opts)
 
 	tests := []struct {
 		name       string
