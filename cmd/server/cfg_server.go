@@ -27,6 +27,7 @@ var (
 	fileStoragePath string
 	restoreOnStart  bool
 	dataBaseDSN     string
+	key             string
 	opts            *config.Options
 )
 
@@ -45,6 +46,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&fileStoragePath, "f", "f", config.DefaultFileStoragePath, "file to store metrics")
 	rootCmd.Flags().BoolVarP(&restoreOnStart, "r", "r", config.DefaultRestoreOnStart, "restore metrics from file on start")
 	rootCmd.Flags().StringVarP(&dataBaseDSN, "d", "d", config.DefaultDataBaseDSN, "database dsn")
+	rootCmd.Flags().StringVarP(&key, "k", "k", config.DefaultKey, "key for hash")
 }
 
 func preRunE(cmd *cobra.Command, args []string) error {
@@ -54,7 +56,8 @@ func preRunE(cmd *cobra.Command, args []string) error {
 		StoreInterval:   storeInterval,
 		FileStoragePath: fileStoragePath,
 		RestoreOnStart:  restoreOnStart,
-		DataBaseDSN:     dataBaseDSN})
+		DataBaseDSN:     dataBaseDSN,
+		Key:             key,})
 
 	opts = config.NewServerOptions(
 		config.WithAddress(opts.EndPointAddr),
@@ -62,6 +65,7 @@ func preRunE(cmd *cobra.Command, args []string) error {
 		config.WithFileStoragePath(opts.FileStoragePath),
 		config.WithRestoreOnStart(opts.RestoreOnStart),
 		config.WithDataBaseDSN(opts.DataBaseDSN),
+		config.WithKey(opts.Key),
 	)
 
 	return err
@@ -128,7 +132,7 @@ func startServer(ctx context.Context, opts *config.Options) error {
 		pingUsecase = nil
 	}
 
-	r := router.NewRouter(server.NewServer(metricUsecase, pingUsecase))
+	r := router.NewRouter(server.NewServer(metricUsecase, pingUsecase), opts)
 
 	srv := &http.Server{
 		Addr:    opts.EndPointAddr,

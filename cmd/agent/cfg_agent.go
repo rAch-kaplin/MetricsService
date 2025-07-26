@@ -23,18 +23,21 @@ const (
 	defaultEndpoint       = "localhost:8080"
 	defaultPollInterval   = 2
 	defaultReportInterval = 10
+	defaultKey            = "key"
 )
 
 type options struct {
 	endPointAddr   string
 	pollInterval   int
 	reportInterval int
+	key            string
 }
 
 type envConfig struct {
 	EndPointAddr   string `env:"ADDRESS"`
 	PollInterval   int    `env:"POLL_INTERVAL"`
 	ReportInterval int    `env:"REPORT_INTERVAL"`
+	Key            string `env:"KEY"`
 }
 
 var opts = &options{}
@@ -73,6 +76,10 @@ var rootCmd = &cobra.Command{
 			opts.reportInterval = cfg.ReportInterval
 		}
 
+		if cfg.Key != "" {
+			opts.key = cfg.Key
+		}
+
 		if opts.pollInterval <= 0 || opts.reportInterval <= 0 {
 			return fmt.Errorf("poll and report intervals must be > 0")
 		}
@@ -102,10 +109,12 @@ func init() {
 	opts.endPointAddr = defaultEndpoint
 	opts.pollInterval = defaultPollInterval
 	opts.reportInterval = defaultReportInterval
+	opts.key = defaultKey
 
 	rootCmd.Flags().StringVarP(&opts.endPointAddr, "a", "a", opts.endPointAddr, "endpoint HTTP-server addr")
 	rootCmd.Flags().IntVarP(&opts.pollInterval, "p", "p", opts.pollInterval, "PollInterval value")
 	rootCmd.Flags().IntVarP(&opts.reportInterval, "r", "r", opts.reportInterval, "PollInterval value")
+	rootCmd.Flags().StringVarP(&opts.key, "k", "k", opts.key, "key for hash")
 }
 
 func startAgent(ctx context.Context) {
@@ -117,6 +126,7 @@ func startAgent(ctx context.Context) {
 		SetBaseURL("http://" + opts.endPointAddr)
 
 	log.Info().Msg("Starting collection and reporting loops")
+	log.Debug().Str("key", opts.key).Msg("")
 
 	pollTimer := time.NewTicker(time.Duration(opts.pollInterval) * time.Second)
 	reportTimer := time.NewTicker(time.Duration(opts.reportInterval) * time.Second)
@@ -132,7 +142,7 @@ func startAgent(ctx context.Context) {
 		case <-pollTimer.C:
 			agent.UpdateAllMetrics(ctx, metricStorage)
 		case <-reportTimer.C:
-			agentUsecase.SendAllMetrics(ctx, client)
+			agentUsecase.SendAllMetrics(ctx, client, opts.key)
 		}
 	}
 }

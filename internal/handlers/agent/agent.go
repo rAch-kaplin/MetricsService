@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/agent"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/hash"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
@@ -56,7 +58,7 @@ func UpdateAllMetrics(ctx context.Context, storage agent.MetricUpdater) {
 	}
 }
 
-func (ag *Agent) SendAllMetrics(ctx context.Context, client *resty.Client) {
+func (ag *Agent) SendAllMetrics(ctx context.Context, client *resty.Client, key string) {
 	allMetrics, err := ag.Usecase.GetAllMetrics(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to Get metrics")
@@ -68,13 +70,13 @@ func (ag *Agent) SendAllMetrics(ctx context.Context, client *resty.Client) {
 	}
 
 	if len(metricsToSend) > 0 {
-		sendBatch(client, metricsToSend)
+		sendBatch(client, metricsToSend, key)
 	}
 
 	log.Info().Int("count", len(metricsToSend)).Msg("Sending metrics batch")
 }
 
-func sendBatch(client *resty.Client, metrics []serialize.Metric) {
+func sendBatch(client *resty.Client, metrics []serialize.Metric, key string) {
 	backoffSchedule := []time.Duration{
 		100 * time.Millisecond,
 		500 * time.Millisecond,
@@ -88,13 +90,28 @@ func sendBatch(client *resty.Client, metrics []serialize.Metric) {
 		return
 	}
 
+	var h string
+	if key != "" {
+		hashBytes, err := hash.GetHash([]byte(key), buf.Bytes())
+		if err != nil {
+			log.Error().Err(err).Msg("can't get hash")
+			return
+		}
+
+		h = hex.EncodeToString(hashBytes)
+	}
+
 	for _, backoff := range backoffSchedule {
 		req := client.R().
 			SetHeader("Content-Type", "application/json").
-			SetBody(buf)
+			SetBody(buf.Bytes())
 
 		if ok {
 			req.SetHeader("Content-Encoding", "gzip")
+		}
+
+		if h != "" {
+			req.SetHeader("HashSHA256", h)
 		}
 
 		res, err := req.Post("updates/")

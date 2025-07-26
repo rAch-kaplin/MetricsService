@@ -15,6 +15,7 @@ const (
 	DefaultFileStoragePath = ""
 	DefaultRestoreOnStart  = true
 	DefaultDataBaseDSN     = ""
+	DefaultKey             = ""
 )
 
 type Options struct {
@@ -23,6 +24,7 @@ type Options struct {
 	FileStoragePath string
 	RestoreOnStart  bool
 	DataBaseDSN     string
+	Key             string
 }
 
 type EnvConfig struct {
@@ -31,6 +33,7 @@ type EnvConfig struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	RestoreOnStart  bool   `env:"RESTORE"`
 	DataBaseDSN     string `env:"DATABASE_DSN"`
+	Key             string `env:"KEY"`
 }
 
 type Option func(*Options)
@@ -42,6 +45,7 @@ func NewServerOptions(options ...Option) *Options {
 		FileStoragePath: DefaultFileStoragePath,
 		RestoreOnStart:  DefaultRestoreOnStart,
 		DataBaseDSN:     DefaultDataBaseDSN,
+		Key:             DefaultKey,
 	}
 
 	for _, opt := range options {
@@ -78,6 +82,12 @@ func WithRestoreOnStart(restore bool) Option {
 func WithDataBaseDSN(dsn string) Option {
 	return func(o *Options) {
 		o.DataBaseDSN = dsn
+	}
+}
+
+func WithKey(key string) Option {
+	return func(o *Options) {
+		o.Key = key
 	}
 }
 
@@ -123,6 +133,12 @@ func ParseFlags(cmd *cobra.Command, src *Options) (*Options, error) {
 		opts.RestoreOnStart = src.RestoreOnStart
 	}
 
+	if cmd.Flags().Changed("k") {
+		if src.Key != "" {
+			opts.Key = src.Key
+		}
+	}
+
 	return &opts, nil
 }
 
@@ -146,6 +162,11 @@ func ParseEnvs(cmd *cobra.Command, opts *Options) error {
 	if envCfg.FileStoragePath != "" {
 		opts.FileStoragePath = envCfg.FileStoragePath
 	}
+
+	if envCfg.Key != "" {
+		opts.Key = envCfg.Key
+	}
+	
 	opts.RestoreOnStart = envCfg.RestoreOnStart
 
 	return nil
