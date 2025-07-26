@@ -58,9 +58,9 @@ func WithHashing(key []byte) func(next http.Handler) http.Handler {
 					valid := hash.CheckHash(key, body, decoded)
 					if !valid {
 						log.Error().Msg("invalid hash message")
-						http.Error(w, "invalid hash message", http.StatusBadRequest)
+						//http.Error(w, "invalid hash message", http.StatusBadRequest)
 
-						return
+						//return
 					}
 				}
 

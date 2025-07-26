@@ -5,11 +5,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
+	srvCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 )
 
-func NewRouter(srv *server.Server, opts *config.Options) http.Handler {
+func NewRouter(srv *server.Server, opts *srvCfg.Options) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(server.WithLogging)

@@ -1,4 +1,4 @@
-package config
+package server
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 const (
 	DefaultEndpoint        = "localhost:8080"
 	DefaultStoreInterval   = 300
-	DefaultFileStoragePath = ""
+	DefaultFileStoragePath = "/tmp/metrics-db.json"
 	DefaultRestoreOnStart  = true
 	DefaultDataBaseDSN     = ""
 	DefaultKey             = ""
@@ -33,7 +33,7 @@ type EnvConfig struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	RestoreOnStart  bool   `env:"RESTORE"`
 	DataBaseDSN     string `env:"DATABASE_DSN"`
-	Key             string `env:"KEY"`
+	Key             string `enc:"KEY"`
 }
 
 type Option func(*Options)
@@ -156,9 +156,11 @@ func ParseEnvs(cmd *cobra.Command, opts *Options) error {
 	if envCfg.EndPointAddr != "" {
 		opts.EndPointAddr = envCfg.EndPointAddr
 	}
+
 	if envCfg.StoreInterval > 0 {
 		opts.StoreInterval = envCfg.StoreInterval
 	}
+
 	if envCfg.FileStoragePath != "" {
 		opts.FileStoragePath = envCfg.FileStoragePath
 	}
@@ -166,7 +168,7 @@ func ParseEnvs(cmd *cobra.Command, opts *Options) error {
 	if envCfg.Key != "" {
 		opts.Key = envCfg.Key
 	}
-	
+
 	opts.RestoreOnStart = envCfg.RestoreOnStart
 
 	return nil
