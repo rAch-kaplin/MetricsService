@@ -13,6 +13,8 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/mailru/easyjson"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/agent"
@@ -21,6 +23,7 @@ import (
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
+	worker "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/worker-pool"
 )
 
 type Agent struct {
@@ -31,14 +34,14 @@ func NewAgent(uc *agent.AgentUsecase) *Agent {
 	return &Agent{Usecase: uc}
 }
 
-func UpdateAllMetrics(ctx context.Context, storage agent.MetricUpdater) {
+func (ag *Agent) UpdateAllMetrics(ctx context.Context) {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
 	for _, stat := range rt.MemRuntimeStats {
 		val := stat.Get(&memStats)
 
-		if err := storage.UpdateMetric(ctx, stat.Type, stat.Name, val); err != nil {
+		if err := ag.Usecase.UpdateMetric(ctx, stat.Type, stat.Name, val); err != nil {
 			log.Error().
 				Err(err).
 				Str("metric", stat.Name).
@@ -49,12 +52,26 @@ func UpdateAllMetrics(ctx context.Context, storage agent.MetricUpdater) {
 		log.Debug().Msgf("update metric %s", stat.Name)
 	}
 
-	if err := storage.UpdateMetric(ctx, models.CounterType, "PollCount", int64(1)); err != nil {
+	if err := ag.Usecase.UpdateMetric(ctx, models.CounterType, "PollCount", int64(1)); err != nil {
 		log.Error().Msgf("Failed to update PollCount metric: %v", err)
 	}
 
-	if err := storage.UpdateMetric(ctx, models.GaugeType, "RandomValue", rand.Float64()); err != nil {
+	if err := ag.Usecase.UpdateMetric(ctx, models.GaugeType, "RandomValue", rand.Float64()); err != nil {
 		log.Error().Msgf("Failed to update RandomValue metric: %v", err)
+	}
+
+	v, _ := mem.VirtualMemory()
+	if err := ag.Usecase.UpdateMetric(ctx, models.GaugeType, "TotalMemory", float64(v.Total)); err != nil {
+		log.Error().Msgf("Failed to update TotalMemory metric: %v", err)
+	}
+
+	if err := ag.Usecase.UpdateMetric(ctx, models.GaugeType, "FreeMemory", float64(v.Free)); err != nil {
+		log.Error().Msgf("Failed to update FreeMemory metric: %v", err)
+	}
+
+	percent, _ := cpu.Percent(0, false)
+	if err := ag.Usecase.UpdateMetric(ctx, models.GaugeType, "CPUutilization1", percent[0]); err != nil {
+		log.Error().Msgf("Failed to update CPUutilization1 metric: %v", err)
 	}
 }
 
@@ -158,4 +175,42 @@ func ConvertToGzipData(metrics serialize.MetricsList) (*bytes.Buffer, bool, erro
 	}
 
 	return &buf, true, nil
+}
+
+func CollectMetrics(ctx context.Context, ag *Agent, pollInterval int) {
+	ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			ag.UpdateAllMetrics(ctx)
+		}
+	}
+}
+
+func SendMetrics(ctx context.Context,
+	ag *Agent,
+	client *resty.Client,
+	wp *worker.WorkerPool,
+	reportInterval int,
+	key string) {
+
+	ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			wp.AddTask(func(ctx context.Context) error {
+				ag.SendAllMetrics(ctx, client, key)
+				return nil
+			})
+		}
+	}
+
 }

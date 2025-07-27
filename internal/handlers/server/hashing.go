@@ -25,13 +25,21 @@ func (hsw *hashResponseWriter) Write(b []byte) (int, error) {
 	if hsw.key != nil && hsw.body.Len() > 0 {
 		newHash, err := hash.GetHash(hsw.key, hsw.body.Bytes())
 		if err != nil {
-			log.Error().Err(err).Msg("failed to get hash")
+			log.Error().Err(err).Msg("failed to get new hash")
+			http.Error(hsw.ResponseWriter, "failed to get new hash", http.StatusInternalServerError)
+			return 0, fmt.Errorf("failed to get new hash: %v", err)
 		}
 
 		hsw.Header().Set("HashSHA256", hex.EncodeToString(newHash))
 	}
 
-	return hsw.ResponseWriter.Write(b)
+	n, err := hsw.ResponseWriter.Write(b)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to writer response")
+		return 0, err
+	}
+
+	return n, nil
 }
 
 func WithHashing(key []byte) func(next http.Handler) http.Handler {
@@ -72,6 +80,8 @@ func WithHashing(key []byte) func(next http.Handler) http.Handler {
 
 				next.ServeHTTP(hw, r)
 			}
+
+			next.ServeHTTP(w, r)
 		})
 	}
 }

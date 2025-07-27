@@ -25,3 +25,7 @@ func (uc *AgentUsecase) GetAllMetrics(ctx context.Context) ([]models.Metric, err
 func (uc *AgentUsecase) GetMetric(ctx context.Context, mType, mName string) (models.Metric, error) {
 	return uc.getter.GetMetric(ctx, mType, mName)
 }
+
+func (uc *AgentUsecase) UpdateMetric(ctx context.Context, mType, mName string, mValue any) error {
+	return uc.updater.UpdateMetric(ctx, mType, mName, mValue)
+}

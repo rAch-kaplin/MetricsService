@@ -3,118 +3,96 @@ package main
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
-	"github.com/caarlos0/env/v6"
 	"github.com/go-resty/resty/v2"
 	"github.com/spf13/cobra"
 
+	agCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/agent"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/agent"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	auc "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/agent"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
+	workerpool "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/worker-pool"
 )
 
-const (
-	defaultEndpoint       = "localhost:8080"
-	defaultPollInterval   = 2
-	defaultReportInterval = 10
-	defaultKey            = "key"
-)
-
-type options struct {
+var (
 	endPointAddr   string
 	pollInterval   int
 	reportInterval int
+	rateLimit      int
 	key            string
-}
-
-type envConfig struct {
-	EndPointAddr   string `env:"ADDRESS"`
-	PollInterval   int    `env:"POLL_INTERVAL"`
-	ReportInterval int    `env:"REPORT_INTERVAL"`
-	Key            string `env:"KEY"`
-}
-
-var opts = &options{}
+	opts           *agCfg.Options
+)
 
 var rootCmd = &cobra.Command{
-	Use:   "agent",
-	Short: "MetricService",
-	Long:  "MetricService",
-	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		logFile, err := log.InitLogger("logFileAgent.log")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Logger init error: %v\n", err)
-			os.Exit(1)
-		}
-
-		defer func() {
-			if err := logFile.Close(); err != nil {
-				log.Error().Err(err).Msg("Failed to close log file")
-			}
-		}()
-
-		var cfg envConfig
-		err = env.Parse(&cfg)
-		if err != nil {
-			return fmt.Errorf("poll and report intervals must be > 0")
-		}
-
-		if cfg.EndPointAddr != "" {
-			opts.endPointAddr = cfg.EndPointAddr
-		}
-		if cfg.PollInterval > 0 {
-			opts.pollInterval = cfg.PollInterval
-		}
-		if cfg.ReportInterval > 0 {
-			opts.reportInterval = cfg.ReportInterval
-		}
-
-		if cfg.Key != "" {
-			opts.key = cfg.Key
-		}
-
-		if opts.pollInterval <= 0 || opts.reportInterval <= 0 {
-			return fmt.Errorf("poll and report intervals must be > 0")
-		}
-
-		if _, _, err := net.SplitHostPort(opts.endPointAddr); err != nil {
-			return fmt.Errorf("invalid address %s: %w", opts.endPointAddr, err)
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		stop := make(chan os.Signal, 1)
-		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-
-		go func() {
-			<-stop
-			cancel()
-		}()
-
-		startAgent(ctx)
-
-		return nil
-	},
+	Use:     "agent",
+	Short:   "MetricService",
+	Long:    "MetricService",
+	Args:    cobra.NoArgs,
+	PreRunE: preRunE,
+	RunE:    runE,
 }
 
 func init() {
-	opts.endPointAddr = defaultEndpoint
-	opts.pollInterval = defaultPollInterval
-	opts.reportInterval = defaultReportInterval
-	opts.key = defaultKey
+	rootCmd.Flags().StringVarP(&endPointAddr, "a", "a", agCfg.DefaultEndpoint, "endpoint HTTP-server addr")
+	rootCmd.Flags().IntVarP(&pollInterval, "p", "p", agCfg.DefaultPollInterval, "PollInterval value")
+	rootCmd.Flags().IntVarP(&reportInterval, "r", "r", agCfg.DefaultReportInterval, "PollInterval value")
+	rootCmd.Flags().StringVarP(&key, "k", "k", agCfg.DefaultKey, "key for hash")
+	rootCmd.Flags().IntVarP(&rateLimit, "l", "l", agCfg.DefaultRateLimit, "rate limit")
+}
 
-	rootCmd.Flags().StringVarP(&opts.endPointAddr, "a", "a", opts.endPointAddr, "endpoint HTTP-server addr")
-	rootCmd.Flags().IntVarP(&opts.pollInterval, "p", "p", opts.pollInterval, "PollInterval value")
-	rootCmd.Flags().IntVarP(&opts.reportInterval, "r", "r", opts.reportInterval, "PollInterval value")
-	rootCmd.Flags().StringVarP(&opts.key, "k", "k", opts.key, "key for hash")
+func preRunE(cmd *cobra.Command, args []string) error {
+	var err error
+	opts, err = agCfg.ParseOptionsFromCmdAndEnvs(cmd, &agCfg.Options{
+		EndPointAddr:   endPointAddr,
+		PollInterval:   pollInterval,
+		ReportInterval: reportInterval,
+		Key:            key,
+		RateLimit:      rateLimit})
+
+	opts = agCfg.NewAgentOptions(
+		agCfg.WithAddress(opts.EndPointAddr),
+		agCfg.WithPollInterval(opts.PollInterval),
+		agCfg.WithReportInterval(opts.ReportInterval),
+		agCfg.WithRateLimit(opts.RateLimit),
+		agCfg.WithKey(opts.Key),
+	)
+
+	return err
+}
+
+func runE(cmd *cobra.Command, args []string) error {
+	logFile, err := log.InitLogger("logFileAgent.log")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Logger init error: %v\n", err)
+		os.Exit(1)
+	}
+
+	defer func() {
+		if err := logFile.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close log file")
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-stop
+		cancel()
+	}()
+
+	startAgent(ctx)
+
+	return nil
 }
 
 func startAgent(ctx context.Context) {
@@ -123,26 +101,29 @@ func startAgent(ctx context.Context) {
 
 	client := resty.New().
 		SetTimeout(5 * time.Second).
-		SetBaseURL("http://" + opts.endPointAddr)
+		SetBaseURL("http://" + opts.EndPointAddr)
 
-	log.Info().Msg("Starting collection and reporting loops")
-	log.Debug().Str("key", opts.key).Msg("")
+	wp := workerpool.New(opts.RateLimit)
 
-	pollTimer := time.NewTicker(time.Duration(opts.pollInterval) * time.Second)
-	reportTimer := time.NewTicker(time.Duration(opts.reportInterval) * time.Second)
+	wp.Start(ctx)
+	defer wp.Wait()
 
-	defer pollTimer.Stop()
-	defer reportTimer.Stop()
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
+	go func() {
+		defer wg.Done()
+		agent.CollectMetrics(ctx, agentUsecase, opts.PollInterval)
+	}()
 
-		case <-pollTimer.C:
-			agent.UpdateAllMetrics(ctx, metricStorage)
-		case <-reportTimer.C:
-			agentUsecase.SendAllMetrics(ctx, client, opts.key)
-		}
-	}
+	go func() {
+		defer wg.Done()
+		agent.SendMetrics(ctx, agentUsecase, client, wp, opts.ReportInterval, opts.Key)
+	}()
+
+	<-ctx.Done()
+
+	wg.Wait()
+
+	log.Info().Msg("Agent stopped gracefully.")
 }
