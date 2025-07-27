@@ -26,6 +26,7 @@ const (
 	defaultPollInterval   = 2
 	defaultReportInterval = 10
 	defaultKey            = "key"
+	defaultRateLimit      = 3
 )
 
 type options struct {
@@ -33,6 +34,7 @@ type options struct {
 	pollInterval   int
 	reportInterval int
 	key            string
+	rateLimit      int
 }
 
 type envConfig struct {
@@ -40,6 +42,7 @@ type envConfig struct {
 	PollInterval   int    `env:"POLL_INTERVAL"`
 	ReportInterval int    `env:"REPORT_INTERVAL"`
 	Key            string `env:"KEY"`
+	RateLimit      int    `env:"RATE_LIMIT"`
 }
 
 var opts = &options{}
@@ -82,6 +85,12 @@ var rootCmd = &cobra.Command{
 			opts.key = cfg.Key
 		}
 
+		if cfg.RateLimit > 0 {
+			opts.rateLimit = cfg.RateLimit
+		} else {
+			opts.rateLimit = defaultRateLimit
+		}
+
 		if opts.pollInterval <= 0 || opts.reportInterval <= 0 {
 			return fmt.Errorf("poll and report intervals must be > 0")
 		}
@@ -117,6 +126,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&opts.pollInterval, "p", "p", opts.pollInterval, "PollInterval value")
 	rootCmd.Flags().IntVarP(&opts.reportInterval, "r", "r", opts.reportInterval, "PollInterval value")
 	rootCmd.Flags().StringVarP(&opts.key, "k", "k", opts.key, "key for hash")
+	rootCmd.Flags().IntVarP(&opts.rateLimit, "l", "l", opts.rateLimit, "rate limit")
 }
 
 func startAgent(ctx context.Context) {
@@ -127,7 +137,7 @@ func startAgent(ctx context.Context) {
 		SetTimeout(5 * time.Second).
 		SetBaseURL("http://" + opts.endPointAddr)
 
-	wp := workerpool.New(3)
+	wp := workerpool.New(opts.rateLimit)
 
 	wp.Start(ctx)
 	defer wp.Wait()

@@ -1,10 +1,10 @@
-package config
+package collector
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
+	srvCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/server"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
@@ -12,7 +12,7 @@ import (
 
 type Params struct {
 	Ctx  context.Context
-	Opts *config.Options
+	Opts *srvCfg.Options
 }
 
 func NewCollector(params *Params) (server.Collector, error) {

@@ -9,7 +9,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
+	srvCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
@@ -20,12 +20,12 @@ import (
 )
 
 func TestUpdateMetric(t *testing.T) {
-	opts := &config.Options{}
-	for _, opt := range []func(*config.Options){
-		config.WithAddress("localhost:8080"),
-		config.WithStoreInterval(300),
-		config.WithFileStoragePath("/tmp/metrics-db.json"),
-		config.WithRestoreOnStart(true),
+	opts := &srvCfg.Options{}
+	for _, opt := range []func(*srvCfg.Options){
+		srvCfg.WithAddress("localhost:8080"),
+		srvCfg.WithStoreInterval(300),
+		srvCfg.WithFileStoragePath("/tmp/metrics-db.json"),
+		srvCfg.WithRestoreOnStart(true),
 	} {
 		opt(opts)
 	}
@@ -97,12 +97,12 @@ func TestUpdateMetric(t *testing.T) {
 }
 
 func TestGetMetric(t *testing.T) {
-	opts := &config.Options{}
-	for _, opt := range []func(*config.Options){
-		config.WithAddress("localhost:8080"),
-		config.WithStoreInterval(300),
-		config.WithFileStoragePath("/tmp/metrics-db.json"),
-		config.WithRestoreOnStart(true),
+	opts := &srvCfg.Options{}
+	for _, opt := range []func(*srvCfg.Options){
+		srvCfg.WithAddress("localhost:8080"),
+		srvCfg.WithStoreInterval(300),
+		srvCfg.WithFileStoragePath("/tmp/metrics-db.json"),
+		srvCfg.WithRestoreOnStart(true),
 	} {
 		opt(opts)
 	}
