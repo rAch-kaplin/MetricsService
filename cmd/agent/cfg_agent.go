@@ -113,7 +113,7 @@ func startAgent(ctx context.Context) {
 
 	go func() {
 		defer wg.Done()
-		agent.CollectMetrics(ctx, metricStorage, opts.PollInterval)
+		agent.CollectMetrics(ctx, agentUsecase, opts.PollInterval)
 	}()
 
 	go func() {

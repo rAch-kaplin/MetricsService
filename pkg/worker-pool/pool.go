@@ -3,12 +3,11 @@ package workerpool
 import (
 	"context"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
-type Task struct {
-	Execute func()
-}
-
+type Task func(ctx context.Context) error
 
 type WorkerPool struct {
 	workers int
@@ -30,8 +29,8 @@ func (wp *WorkerPool) Start(ctx context.Context) {
 	}
 }
 
-func (wp *WorkerPool) AddTask(task *Task) {
-	wp.tasks <- *task
+func (wp *WorkerPool) AddTask(task Task) {
+	wp.tasks <- task
 }
 
 func (wp *WorkerPool) Wait() {
@@ -39,7 +38,7 @@ func (wp *WorkerPool) Wait() {
 	wp.wg.Wait()
 }
 
-func worker(ctx context.Context, wg *sync.WaitGroup, tasks <- chan Task) {
+func worker(ctx context.Context, wg *sync.WaitGroup, tasks <-chan Task) {
 	defer wg.Done()
 
 	for {
@@ -51,7 +50,11 @@ func worker(ctx context.Context, wg *sync.WaitGroup, tasks <- chan Task) {
 			if !ok {
 				return
 			}
-			task.Execute()
+			err := task(ctx)
+			if err != nil {
+				log.Error().Err(err).Msg("worker pool failed")
+				return
+			}
 		}
 	}
 }
