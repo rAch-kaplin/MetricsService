@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	auc "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/agent"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
+	workerpool "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/worker-pool"
 )
 
 const (
@@ -125,24 +127,27 @@ func startAgent(ctx context.Context) {
 		SetTimeout(5 * time.Second).
 		SetBaseURL("http://" + opts.endPointAddr)
 
-	log.Info().Msg("Starting collection and reporting loops")
-	log.Debug().Str("key", opts.key).Msg("")
+	wp := workerpool.New(3)
 
-	pollTimer := time.NewTicker(time.Duration(opts.pollInterval) * time.Second)
-	reportTimer := time.NewTicker(time.Duration(opts.reportInterval) * time.Second)
+	wp.Start(ctx)
+	defer wp.Wait()
 
-	defer pollTimer.Stop()
-	defer reportTimer.Stop()
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
+	go func() {
+		defer wg.Done()
+		agent.CollectMetrics(ctx, metricStorage, opts.pollInterval)
+	}()
 
-		case <-pollTimer.C:
-			agent.UpdateAllMetrics(ctx, metricStorage)
-		case <-reportTimer.C:
-			agentUsecase.SendAllMetrics(ctx, client, opts.key)
-		}
-	}
+	go func() {
+		defer wg.Done()
+		agent.SendMetrics(ctx, agentUsecase, client, wp, opts.reportInterval, opts.key)
+	}()
+
+	<-ctx.Done()
+
+	wg.Wait()
+
+	log.Info().Msg("Agent stopped gracefully.")
 }
