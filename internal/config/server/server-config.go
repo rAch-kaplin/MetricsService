@@ -166,7 +166,6 @@ func ParseEnvs(cmd *cobra.Command, opts *Options) error {
 	if envCfg.Key != "" {
 		opts.Key = envCfg.Key
 	}
-
 	opts.RestoreOnStart = envCfg.RestoreOnStart
 
 	return nil
