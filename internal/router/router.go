@@ -5,14 +5,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
 )
 
-func NewRouter(srv *server.Server) http.Handler {
+func NewRouter(srv *server.Server, opts *config.Options) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(server.WithLogging)
 	r.Use(server.WithGzipCompress)
+
+	if opts.Key != "" {
+		r.Use(server.WithHashing([]byte(opts.Key)))
+	}
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", srv.GetAllMetrics())
