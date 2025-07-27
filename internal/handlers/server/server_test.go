@@ -173,3 +173,43 @@ func TestGetMetric(t *testing.T) {
 		})
 	}
 }
+
+func TestGetAllMetrics(t *testing.T) {
+  opts := &srvCfg.Options{}
+  for _, opt := range []func(*srvCfg.Options){
+    srvCfg.WithAddress("localhost:8080"),
+    srvCfg.WithStoreInterval(300),
+    srvCfg.WithFileStoragePath("/tmp/metrics-db.json"),
+    srvCfg.WithRestoreOnStart(true),
+  } {
+    opt(opts)
+  }
+
+  ctx := context.Background()
+  storage := repo.NewMemStorage()
+
+  if err := storage.UpdateMetric(ctx, models.GaugeType, "cpu_usage", 75.5); err != nil {
+    log.Error().Msgf("Failed to update metric cpu_usage: %v", err)
+  }
+
+  if err := storage.UpdateMetric(ctx, models.CounterType, "requests_total", int64(100)); err != nil {
+    log.Error().Msgf("Failed to update metric requests_total: %v", err)
+  }
+
+  metricUsecase := srvUsecase.NewMetricUsecase(storage, storage, storage)
+  router := router.NewRouter(server.NewServer(metricUsecase, nil), opts)
+
+  t.Run("GetAllMetrics returned HTML metrics", func(t *testing.T) {
+    req := httptest.NewRequest(http.MethodGet, "/", nil)
+    rr := httptest.NewRecorder()
+
+    router.ServeHTTP(rr, req)
+
+    assert.Equal(t, http.StatusOK, rr.Code)
+    body, _ := io.ReadAll(rr.Body)
+
+    assert.Contains(t, string(body), "cpu_usage")
+    assert.Contains(t, string(body), "requests_total")
+    assert.Contains(t, string(body), "<html>")
+  })
+}
