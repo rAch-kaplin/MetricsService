@@ -115,7 +115,7 @@ func (db *Database) GetAllMetrics(ctx context.Context) ([]models.Metric, error) 
 
 	if err != nil {
 		log.Error().Err(err).Msg("The request was not processed")
-		return nil, fmt.Errorf("failed to query all metrics: %v", err)
+		return nil, fmt.Errorf("failed to query all metrics: %w", err)
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {

@@ -26,6 +26,9 @@ agent: deps
 test:
 	@go test ./... -v
 
+bench:
+	@go test -bench=. -benchmem ./...
+
 deps:
 	@go mod download
 

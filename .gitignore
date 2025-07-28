@@ -36,4 +36,6 @@ logFileAgent.log
 cmd/server/server
 cmd/agent/agent
 
+profiles/
+
 log.txt
