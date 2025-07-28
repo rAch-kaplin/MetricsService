@@ -32,4 +32,3 @@ func (g *gauge) Update(mValue any) error {
 	g.value = value
 	return nil
 }
-
