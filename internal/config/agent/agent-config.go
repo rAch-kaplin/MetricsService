@@ -13,7 +13,7 @@ const (
 	DefaultPollInterval   = 2
 	DefaultReportInterval = 10
 	DefaultKey            = ""
-	DefaultRateLimit      = 3
+	DefaultRateLimit      = 10
 )
 
 type Options struct {
