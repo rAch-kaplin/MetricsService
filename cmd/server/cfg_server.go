@@ -1,3 +1,16 @@
+// The server is a service that receives metrics from the agent and stores them in memory.
+//
+// # Command-line flags
+// -a, --a string   endpoint HTTP-server addr (default "localhost:8080")
+// -i, --i int      store interval in seconds (0 = sync) (default 300)
+// -f, --f string   file to store metrics (default "")
+// -r, --r bool     restore metrics from file on start (default true)
+// -d, --d string   database dsn (default "")
+// -k, --k string   key for hash (default "")
+//
+// Author rAch-kaplin
+// Version 1.0.0
+// Since 2025-07-29
 package main
 
 import (

@@ -1,3 +1,49 @@
+// @Title Agent Handlers API
+// @Description This package implements the core logic of the metrics collection agent.
+// The collected metrics include:
+//
+// Gauge Metrics:
+// - Alloc: Bytes of allocated heap objects.
+// - BuckHashSys: Bytes used by the profiling bucket hash table.
+// - Frees: Total number of frees.
+// - GCCPUFraction: Fraction of CPU time used by GC.
+// - GCSys: Bytes used for garbage collection system metadata.
+// - HeapAlloc: Bytes allocated and still in use on the heap.
+// - HeapIdle: Bytes in idle spans.
+// - HeapInuse: Bytes in in-use spans.
+// - HeapObjects: Number of allocated heap objects.
+// - HeapReleased: Bytes of physical memory returned to the OS.
+// - HeapSys: Bytes of heap memory obtained from the OS.
+// - LastGC: Time the last garbage collection finished, as nanoseconds since epoch.
+// - Lookups: Number of pointer lookups.
+// - MCacheInuse: Bytes used for mcache structures.
+// - MCacheSys: Bytes obtained from the OS for mcache structures.
+// - MSpanInuse: Bytes used for mspan structures.
+// - MSpanSys: Bytes obtained from the OS for mspan structures.
+// - Mallocs: Total number of mallocs.
+// - NextGC: Target heap size for the next GC cycle.
+// - NumForcedGC: Number of forced GCs.
+// - NumGC: Number of completed GC cycles.
+// - OtherSys: Bytes used for other system allocations.
+// - PauseTotalNs: Cumulative nanoseconds in GC stop-the-world pauses.
+// - StackInuse: Bytes used by stack spans.
+// - StackSys: Bytes obtained from the OS for stack spans.
+// - Sys: Total bytes obtained from the OS.
+// - TotalAlloc: Cumulative bytes allocated for heap objects.
+// - RandomValue: A random value.
+// - TotalMemory: Total memory available to the process.
+// - FreeMemory: Free memory available to the process.
+// - CPUutilization1: CPU utilization percentage.
+//
+// Counter Metrics:
+// - PollCount: Number of times the agent has polled metrics.
+//
+// These metrics are collected periodically by the agent and sent to a remote server using a metrics API
+//
+// @Author rAch-kaplin
+// @Version 1.0.0
+// @Since 2025-07-29
+
 package agent
 
 import (
@@ -34,6 +80,12 @@ func NewAgent(uc *agent.AgentUsecase) *Agent {
 	return &Agent{Usecase: uc}
 }
 
+// @Title UpdateAllMetrics
+// @Description Update all metrics
+// @Tags metrics
+// @Produces text/plain
+// @Success 200 {string} string "Metrics updated successfully"
+// @Failure 500 {string} string "Internal server error"
 func (ag *Agent) UpdateAllMetrics(ctx context.Context) {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
@@ -75,6 +127,12 @@ func (ag *Agent) UpdateAllMetrics(ctx context.Context) {
 	}
 }
 
+// @Title SendAllMetrics
+// @Description Send all metrics to the server
+// @Tags metrics
+// @Produces text/plain
+// @Success 200 {string} string "Metrics sent successfully"
+// @Failure 500 {string} string "Internal server error"
 func (ag *Agent) SendAllMetrics(ctx context.Context, client *resty.Client, key string) {
 	allMetrics, err := ag.Usecase.GetAllMetrics(ctx)
 	if err != nil {
@@ -93,6 +151,12 @@ func (ag *Agent) SendAllMetrics(ctx context.Context, client *resty.Client, key s
 	log.Info().Int("count", len(metricsToSend)).Msg("Sending metrics batch")
 }
 
+// @Title sendBatch
+// @Description Send a batch of metrics to the server
+// @Tags metrics
+// @Produces text/plain
+// @Success 200 {string} string "Metrics sent successfully"
+// @Failure 500 {string} string "Internal server error"
 func sendBatch(client *resty.Client, metrics []serialize.Metric, key string) {
 	backoffSchedule := []time.Duration{
 		100 * time.Millisecond,
@@ -142,6 +206,12 @@ func sendBatch(client *resty.Client, metrics []serialize.Metric, key string) {
 	}
 }
 
+// @Title ConvertToGzipData
+// @Description Convert metrics to gzip data
+// @Tags metrics
+// @Produces text/plain
+// @Success 200 {string} string "Metrics converted successfully"
+// @Failure 500 {string} string "Internal server error"
 func ConvertToGzipData(metrics serialize.MetricsList) (*bytes.Buffer, bool, error) {
 	var jsonBuf bytes.Buffer
 
@@ -177,6 +247,7 @@ func ConvertToGzipData(metrics serialize.MetricsList) (*bytes.Buffer, bool, erro
 	return &buf, true, nil
 }
 
+// This func is used to collect metrics from the system
 func CollectMetrics(ctx context.Context, ag *Agent, pollInterval int) {
 	ticker := time.NewTicker(time.Duration(pollInterval) * time.Second)
 	defer ticker.Stop()
@@ -191,6 +262,7 @@ func CollectMetrics(ctx context.Context, ag *Agent, pollInterval int) {
 	}
 }
 
+// This func is used to send metrics to the server
 func SendMetrics(ctx context.Context,
 	ag *Agent,
 	client *resty.Client,

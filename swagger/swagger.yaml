@@ -1,0 +1,175 @@
+info:
+  contact: {}
+paths:
+  /:
+    get:
+      description: Get all metrics
+      responses:
+        "200":
+          description: Metrics table
+          schema:
+            type: string
+        "404":
+          description: Metrics not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - metrics
+  /ping:
+    get:
+      description: Check if the database is reachable
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Database connection failed
+          schema:
+            type: string
+      tags:
+      - metrics
+  /update:
+    post:
+      consumes:
+      - application/json
+      description: Update a metric by type and name
+      responses:
+        "400":
+          description: Invalid JSON body
+          schema:
+            type: string
+        "404":
+          description: Metric not found
+          schema:
+            type: string
+        "415":
+          description: Unsupported media type
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - metrics
+  /update/{mType}/{mName}/{mValue}:
+    post:
+      description: Update a metric by type, name and value from URL parameters
+      parameters:
+      - description: Metric type
+        in: path
+        name: mType
+        required: true
+        type: string
+      - description: Metric name
+        in: path
+        name: mName
+        required: true
+        type: string
+      - description: Metric value
+        in: path
+        name: mValue
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Metric updated successfully
+          schema:
+            type: string
+        "400":
+          description: Bad request - invalid metric value or name not specified
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - metrics
+  /updates:
+    post:
+      consumes:
+      - application/json
+      description: Update a list of metrics
+      responses:
+        "200":
+          description: Metrics updated successfully
+          schema:
+            type: string
+        "400":
+          description: Invalid JSON body
+          schema:
+            type: string
+        "415":
+          description: Unsupported media type
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - metrics
+  /value:
+    post:
+      consumes:
+      - application/json
+      description: Get a metric by type and name
+      responses:
+        "400":
+          description: Invalid JSON body
+          schema:
+            type: string
+        "404":
+          description: Metric not found
+          schema:
+            type: string
+        "415":
+          description: Unsupported media type
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - metrics
+  /value/{mType}/{mName}:
+    get:
+      description: Get a metric by type and name from URL parameters
+      parameters:
+      - description: Metric type
+        in: path
+        name: mType
+        required: true
+        type: string
+      - description: Metric name
+        in: path
+        name: mName
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Metric value
+          schema:
+            type: string
+        "400":
+          description: Bad request
+          schema:
+            type: string
+        "404":
+          description: Metric not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - metrics
+swagger: "2.0"
