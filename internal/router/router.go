@@ -21,6 +21,7 @@ import (
 // - WithLogging: Logs the request and response.
 // - WithGzipCompress: Compresses the response using gzip.
 // - WithHashing: Hashes the request body using the key.
+// - WithTrustedSubnet: Checks if the request is from a trusted subnet.
 //
 // Routes:
 //
@@ -39,6 +40,7 @@ func NewRouter(srv *server.Server, opts *srvCfg.Options) http.Handler {
 
 	r.Use(server.WithLogging)
 	r.Use(server.WithGzipCompress)
+	r.Use(server.WithTrustedSubnet(opts.TrustedSubnet))
 
 	if opts.Key != "" {
 		r.Use(server.WithHashing([]byte(opts.Key)))

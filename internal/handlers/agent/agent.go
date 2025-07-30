@@ -53,6 +53,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
+	"net"
 	"net/http"
 	"runtime"
 	"time"
@@ -182,9 +183,16 @@ func sendBatch(client *resty.Client, metrics []serialize.Metric, key string) {
 		h = hex.EncodeToString(hashBytes)
 	}
 
+	ip, err := GetOutboundIP()
+	if err != nil {
+		log.Error().Err(err).Msg("can't get outbound ip")
+		return
+	}
+
 	for _, backoff := range backoffSchedule {
 		req := client.R().
 			SetHeader("Content-Type", "application/json").
+			SetHeader("X-Real-IP", ip.String()).
 			SetBody(buf.Bytes())
 
 		if ok {
@@ -204,6 +212,21 @@ func sendBatch(client *resty.Client, metrics []serialize.Metric, key string) {
 
 		time.Sleep(backoff)
 	}
+}
+
+// This func is used to get the outbound ip of the machine
+func GetOutboundIP() (net.IP, error) {
+	// Create a UDP connection to a known IP address
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	return conn.LocalAddr().(*net.UDPAddr).IP, nil
 }
 
 // @Title ConvertToGzipData
