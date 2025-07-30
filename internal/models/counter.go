@@ -32,4 +32,3 @@ func (c *counter) Update(mValue any) error {
 	c.value += value
 	return nil
 }
-

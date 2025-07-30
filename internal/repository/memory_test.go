@@ -284,3 +284,29 @@ func TestMemStorage_GetAllMetrics(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkMemStorage_UpdateMetricList(b *testing.B) {
+	ctx := context.Background()
+
+	ms := repository.NewMemStorage()
+
+	metrics := []models.Metric{
+		models.NewCounter("test_counter", 100),
+		models.NewGauge("test_gauge", 100.0),
+	}
+
+	for i := 0; i < b.N; i++ {
+		_ = ms.UpdateMetricList(ctx, metrics)
+	}
+}
+
+func BenchmarkMemStorage_GetMetric(b *testing.B) {
+	ctx := context.Background()
+	m := repository.NewMemStorage()
+	_ = m.UpdateMetric(ctx, models.CounterType, "counter", int64(1))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = m.GetMetric(ctx, models.CounterType, "counter")
+	}
+}

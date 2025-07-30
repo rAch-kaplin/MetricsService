@@ -1,3 +1,16 @@
+// Package collector provides a configuration for the collector.
+//
+// The storage is chosen in the following order:
+//   1. Database storage – used if DataBaseDSN is set.
+//   2. File storage – used if FileStoragePath is set.
+//   3. In-memory storage – used by default if nothing else is configured.
+//
+// NewCollector reads options from Params and returns the correct storage.
+//
+// Author rAch-kaplin
+// Version 1.0.0
+// Since 2025-07-29
+
 package collector
 
 import (

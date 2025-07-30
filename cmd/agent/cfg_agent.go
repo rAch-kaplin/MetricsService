@@ -1,3 +1,17 @@
+// The agent is a service that collects metrics from the system and sends them to the server.
+// It uses a memory storage to store metrics and a worker pool to send metrics to the server.
+//
+// # Command-line flags
+// -a, --a string   endpoint HTTP-server addr (default "localhost:8080")
+// -k, --k string   key for hash (default "")
+// -l, --l int      rate limit (default 10)
+// -p, --p int      PollInterval value (default 2)
+// -r, --r int      PollInterval value (default 10)
+//
+// Author rAch-kaplin
+// Version 1.0.0
+// Since 2025-07-29
+
 package main
 
 import (

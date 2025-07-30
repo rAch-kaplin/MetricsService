@@ -16,6 +16,7 @@ const (
 	DefaultRestoreOnStart  = true
 	DefaultDataBaseDSN     = ""
 	DefaultKey             = ""
+	DefaultTrustedSubnet   = ""
 )
 
 type Options struct {
@@ -25,6 +26,7 @@ type Options struct {
 	RestoreOnStart  bool
 	DataBaseDSN     string
 	Key             string
+	TrustedSubnet   string
 }
 
 type EnvConfig struct {
@@ -34,6 +36,7 @@ type EnvConfig struct {
 	RestoreOnStart  bool   `env:"RESTORE"`
 	DataBaseDSN     string `env:"DATABASE_DSN"`
 	Key             string `env:"KEY"`
+	TrustedSubnet   string `env:"TRUSTED_SUBNET"`
 }
 
 type Option func(*Options)
@@ -46,6 +49,7 @@ func NewServerOptions(options ...Option) *Options {
 		RestoreOnStart:  DefaultRestoreOnStart,
 		DataBaseDSN:     DefaultDataBaseDSN,
 		Key:             DefaultKey,
+		TrustedSubnet:   DefaultTrustedSubnet,
 	}
 
 	for _, opt := range options {
@@ -88,6 +92,12 @@ func WithDataBaseDSN(dsn string) Option {
 func WithKey(key string) Option {
 	return func(o *Options) {
 		o.Key = key
+	}
+}
+
+func WithTrustedSubnet(subnet string) Option {
+	return func(o *Options) {
+		o.TrustedSubnet = subnet
 	}
 }
 
@@ -139,6 +149,10 @@ func ParseFlags(cmd *cobra.Command, src *Options) (*Options, error) {
 		}
 	}
 
+	if cmd.Flags().Changed("t") {
+		opts.TrustedSubnet = src.TrustedSubnet
+	}
+
 	return &opts, nil
 }
 
@@ -165,6 +179,9 @@ func ParseEnvs(cmd *cobra.Command, opts *Options) error {
 
 	if envCfg.Key != "" {
 		opts.Key = envCfg.Key
+	}
+	if envCfg.TrustedSubnet != "" {
+		opts.TrustedSubnet = envCfg.TrustedSubnet
 	}
 	opts.RestoreOnStart = envCfg.RestoreOnStart
 

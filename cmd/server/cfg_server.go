@@ -1,3 +1,17 @@
+// The server is a service that receives metrics from the agent and stores them in memory.
+//
+// # Command-line flags
+// -a, --a string   endpoint HTTP-server addr (default "localhost:8080")
+// -i, --i int      store interval in seconds (0 = sync) (default 300)
+// -f, --f string   file to store metrics (default "")
+// -r, --r bool     restore metrics from file on start (default true)
+// -d, --d string   database dsn (default "")
+// -k, --k string   key for hash (default "")
+// -t, --t string   trusted subnet (default "")
+//
+// Author rAch-kaplin
+// Version 1.0.0
+// Since 2025-07-29
 package main
 
 import (
@@ -8,6 +22,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	_ "net/http/pprof"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/spf13/cobra"
@@ -28,6 +44,7 @@ var (
 	restoreOnStart  bool
 	dataBaseDSN     string
 	key             string
+	trustedSubnet   string
 	opts            *srvCfg.Options
 )
 
@@ -47,6 +64,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&restoreOnStart, "r", "r", srvCfg.DefaultRestoreOnStart, "restore metrics from file on start")
 	rootCmd.Flags().StringVarP(&dataBaseDSN, "d", "d", srvCfg.DefaultDataBaseDSN, "database dsn")
 	rootCmd.Flags().StringVarP(&key, "k", "k", srvCfg.DefaultKey, "key for hash")
+	rootCmd.Flags().StringVarP(&trustedSubnet, "t", "t", srvCfg.DefaultTrustedSubnet, "trusted subnet")
 }
 
 func preRunE(cmd *cobra.Command, args []string) error {
@@ -57,7 +75,9 @@ func preRunE(cmd *cobra.Command, args []string) error {
 		FileStoragePath: fileStoragePath,
 		RestoreOnStart:  restoreOnStart,
 		DataBaseDSN:     dataBaseDSN,
-		Key:             key,})
+		Key:             key,
+		TrustedSubnet:   trustedSubnet,
+	})
 
 	opts = srvCfg.NewServerOptions(
 		srvCfg.WithAddress(opts.EndPointAddr),
@@ -66,6 +86,7 @@ func preRunE(cmd *cobra.Command, args []string) error {
 		srvCfg.WithRestoreOnStart(opts.RestoreOnStart),
 		srvCfg.WithDataBaseDSN(opts.DataBaseDSN),
 		srvCfg.WithKey(opts.Key),
+		srvCfg.WithTrustedSubnet(opts.TrustedSubnet),
 	)
 
 	return err
@@ -81,6 +102,11 @@ func runE(cmd *cobra.Command, args []string) error {
 		if err := logFile.Close(); err != nil {
 			log.Error().Err(err).Msg("Failed to close log file")
 		}
+	}()
+
+	go func() {
+		fmt.Println("pprof listening on :6060")
+		_ = http.ListenAndServe("localhost:6060", nil)
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -139,24 +165,30 @@ func startServer(ctx context.Context, opts *srvCfg.Options) error {
 		Handler: r,
 	}
 
+	srvErrCh := make(chan error, 1)
+
 	go func() {
 		log.Info().Msg("Starting HTTP server...")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msg("HTTP server failed unexpectedly")
+			srvErrCh <- err
 		}
 	}()
 
-	<-ctx.Done()
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Error().Err(err).Msg("Failed to gracefully shutdown server")
+	select {
+	case err := <-srvErrCh:
 		return err
-	}
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
 
-	log.Info().Msg("Server gracefully stopped")
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Error().Err(err).Msg("Failed to gracefully shutdown server")
+			return err
+		}
+
+		log.Info().Msg("Server gracefully stopped")
+	}
 
 	return nil
 }
-
