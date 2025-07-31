@@ -33,6 +33,7 @@ type Options struct {
 
 type EnvConfig struct {
 	EndPointAddr    string `env:"ADDRESS"`
+	GRPCAddress     string `env:"GRPC_ADDRESS"`
 	StoreInterval   int    `env:"STORE_INTERVAL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	RestoreOnStart  bool   `env:"RESTORE"`
@@ -136,6 +137,9 @@ func ParseFlags(cmd *cobra.Command, src *Options) (*Options, error) {
 	if cmd.Flags().Changed("a") {
 		opts.HTTPAddress = src.HTTPAddress
 	}
+	if cmd.Flags().Changed("g") {
+		opts.GRPCAddress = src.GRPCAddress
+	}
 	if cmd.Flags().Changed("i") {
 		if src.StoreInterval < 0 {
 			return nil, fmt.Errorf("store interval must be >= 0, got %d", src.StoreInterval)
@@ -179,6 +183,10 @@ func ParseEnvs(cmd *cobra.Command, opts *Options) error {
 	if envCfg.EndPointAddr != "" {
 		opts.HTTPAddress = envCfg.EndPointAddr
 	}
+	if envCfg.GRPCAddress != "" {
+		opts.GRPCAddress = envCfg.GRPCAddress
+	}
+
 	if envCfg.StoreInterval > 0 {
 		opts.StoreInterval = envCfg.StoreInterval
 	}

@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	DefaultEndpoint       = "localhost:8080"
+	DefaultHTTPAddress    = "localhost:8080"
+	DefaultGRPCAddress    = "localhost:8081"
 	DefaultPollInterval   = 2
 	DefaultReportInterval = 10
 	DefaultKey            = ""
@@ -17,7 +18,8 @@ const (
 )
 
 type Options struct {
-	EndPointAddr   string
+	HTTPAddress    string
+	GRPCAddress    string
 	PollInterval   int
 	ReportInterval int
 	Key            string
@@ -26,6 +28,7 @@ type Options struct {
 
 type EnvConfig struct {
 	EndPointAddr   string `env:"ADDRESS"`
+	GRPCAddress    string `env:"GRPC_ADDRESS"`
 	PollInterval   int    `env:"POLL_INTERVAL"`
 	ReportInterval int    `env:"REPORT_INTERVAL"`
 	Key            string `env:"KEY"`
@@ -36,7 +39,8 @@ type Option func(*Options)
 
 func NewAgentOptions(options ...Option) *Options {
 	opts := &Options{
-		EndPointAddr:   DefaultEndpoint,
+		HTTPAddress:    DefaultHTTPAddress,
+		GRPCAddress:    DefaultGRPCAddress,
 		PollInterval:   DefaultPollInterval,
 		ReportInterval: DefaultReportInterval,
 		Key:            DefaultKey,
@@ -52,7 +56,13 @@ func NewAgentOptions(options ...Option) *Options {
 
 func WithAddress(addr string) Option {
 	return func(o *Options) {
-		o.EndPointAddr = addr
+		o.HTTPAddress = addr
+	}
+}
+
+func WithGRPCAddress(addr string) Option {
+	return func(o *Options) {
+		o.GRPCAddress = addr
 	}
 }
 
@@ -90,8 +100,8 @@ func ParseOptionsFromCmdAndEnvs(cmd *cobra.Command, src *Options) (*Options, err
 		return nil, err
 	}
 
-	if _, _, err := net.SplitHostPort(opts.EndPointAddr); err != nil {
-		return nil, fmt.Errorf("invalid address %s: %w", opts.EndPointAddr, err)
+	if _, _, err := net.SplitHostPort(opts.HTTPAddress); err != nil {
+		return nil, fmt.Errorf("invalid address %s: %w", opts.HTTPAddress, err)
 	}
 
 	return opts, nil
@@ -101,7 +111,11 @@ func ParseFlags(cmd *cobra.Command, src *Options) (*Options, error) {
 	opts := *src
 
 	if cmd.Flags().Changed("a") {
-		opts.EndPointAddr = src.EndPointAddr
+		opts.HTTPAddress = src.HTTPAddress
+	}
+
+	if cmd.Flags().Changed("g") {
+		opts.GRPCAddress = src.GRPCAddress
 	}
 
 	if cmd.Flags().Changed("p") {
@@ -145,7 +159,11 @@ func ParseEnvs(cmd *cobra.Command, opts *Options) error {
 	}
 
 	if cfg.EndPointAddr != "" {
-		opts.EndPointAddr = cfg.EndPointAddr
+		opts.HTTPAddress = cfg.EndPointAddr
+	}
+
+	if cfg.GRPCAddress != "" {
+		opts.GRPCAddress = cfg.GRPCAddress
 	}
 
 	if cfg.PollInterval > 0 {
@@ -170,8 +188,8 @@ func ParseEnvs(cmd *cobra.Command, opts *Options) error {
 		return fmt.Errorf("poll and report intervals must be > 0")
 	}
 
-	if _, _, err := net.SplitHostPort(opts.EndPointAddr); err != nil {
-		return fmt.Errorf("invalid address %s: %w", opts.EndPointAddr, err)
+	if _, _, err := net.SplitHostPort(opts.HTTPAddress); err != nil {
+		return fmt.Errorf("invalid address %s: %w", opts.HTTPAddress, err)
 	}
 
 	return nil

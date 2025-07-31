@@ -187,12 +187,16 @@ func convertToProtoMetric(src models.Metric) *pb.Metric {
 	return nil
 }
 
-func ConvertToProtoMetrics(src []models.Metric) []*pb.Metric {
+func ConvertToProtoMetrics(src []models.Metric) ([]*pb.Metric, error) {
 	converted := make([]*pb.Metric, 0, len(src))
 
 	for _, m := range src {
-		converted = append(converted, convertToProtoMetric(m))
+		metric := convertToProtoMetric(m)
+		if metric == nil {
+			return nil, fmt.Errorf("failed to convert metric %+v", m)
+		}
+		converted = append(converted, metric)
 	}
 
-	return converted
+	return converted, nil
 }

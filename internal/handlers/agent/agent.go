@@ -71,6 +71,7 @@ import (
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	worker "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/worker-pool"
+	pb "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/grpc-metrics"
 )
 
 type Agent struct {
@@ -308,4 +309,45 @@ func SendMetrics(ctx context.Context,
 		}
 	}
 
+}
+
+func (ag *Agent) SendAllMetricsGRPC(ctx context.Context, client pb.MetricsServiceClient) {
+	allMetrics, err := ag.Usecase.GetAllMetrics(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to Get metrics")
+	}
+
+	metricsToProto, err := converter.ConvertToProtoMetrics(allMetrics)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert metrics to proto")
+	}
+
+	_, err = client.UpdateMetrics(ctx, &pb.UpdateMetricsRequest{
+		Metrics: metricsToProto,
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("failed to send metrics")
+	}
+}
+
+func SendMetricsGRPC(ctx context.Context,
+	ag *Agent,
+	client pb.MetricsServiceClient,
+	wp *worker.WorkerPool,
+	reportInterval int) {
+
+	ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			wp.AddTask(func(ctx context.Context) error {
+				ag.SendAllMetricsGRPC(ctx, client)
+				return nil
+			})
+		}
+	}
 }

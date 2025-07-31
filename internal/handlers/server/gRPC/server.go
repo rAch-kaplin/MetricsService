@@ -33,7 +33,11 @@ func (s *Server) GetMetric(ctx context.Context, req *pb.GetMetricRequest) (*pb.G
 		return nil, status.Errorf(codes.NotFound, "failed to get metric: %v", err)
 	}
 
-	protoMetric := converter.ConvertToProtoMetrics([]models.Metric{metric})
+	protoMetric, err := converter.ConvertToProtoMetrics([]models.Metric{metric})
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert metric to proto")
+		return nil, status.Errorf(codes.Internal, "failed to convert metric to proto: %v", err)
+	}
 
 	return &pb.GetMetricResponse{
 		Metric: protoMetric[0],
@@ -47,7 +51,11 @@ func (s *Server) GetAllMetrics(ctx context.Context) (*pb.GetAllMetricsResponse, 
 		return nil, status.Errorf(codes.NotFound, "failed to get all metrics: %v", err)
 	}
 
-	protoMetrics := converter.ConvertToProtoMetrics(metrics)
+	protoMetrics, err := converter.ConvertToProtoMetrics(metrics)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to convert metrics to proto")
+		return nil, status.Errorf(codes.Internal, "failed to convert metrics to proto: %v", err)
+	}
 
 	return &pb.GetAllMetricsResponse{
 		Metrics: protoMetrics,
