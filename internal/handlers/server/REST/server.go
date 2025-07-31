@@ -4,7 +4,7 @@
 // @Version 1.0.0
 // @Since 2025-07-29
 
-package REST
+package rest
 
 import (
 	"compress/gzip"

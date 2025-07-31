@@ -33,7 +33,7 @@ import (
 
 	colcfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/collector"
 	srvCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/server"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server/REST"
+	rest "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server/REST"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/ping"
 	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
@@ -218,7 +218,7 @@ func startHTTPServer(ctx context.Context,
 		Str("address", opts.HTTPAddress).
 		Msg("Server configuration")
 
-	r := router.NewRouter(REST.NewServer(metricUsecase, pingUsecase), opts)
+	r := router.NewRouter(rest.NewServer(metricUsecase, pingUsecase), opts)
 
 	srv := &http.Server{
 		Addr:    opts.HTTPAddress,

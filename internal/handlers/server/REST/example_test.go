@@ -1,4 +1,4 @@
-package REST_test
+package rest_test
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server/REST"
+	rest "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server/REST"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
 )
@@ -21,7 +21,7 @@ func Example() {
 	metricUsecase := srvUsecase.NewMetricUsecase(storage, storage, storage)
 
 	// Create server with the metric use case
-	srv := REST.NewServer(metricUsecase, nil)
+	srv := rest.NewServer(metricUsecase, nil)
 
 	// Create an HTTP POST request to update gauge metric "Alloc" to value 200
 	req, _ := http.NewRequest("POST", "/update/gauge/Alloc/200", nil)
