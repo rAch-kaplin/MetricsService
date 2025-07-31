@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,18 +28,22 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 
 	colcfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/collector"
 	srvCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/server"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
+	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server/REST"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/ping"
 	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
+	pb "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/grpc-metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
 var (
-	endPointAddr    string
+	httpAddress     string
+	grpcAddress     string
 	storeInterval   int
 	fileStoragePath string
 	restoreOnStart  bool
@@ -58,7 +63,8 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&endPointAddr, "a", "a", srvCfg.DefaultEndpoint, "endpoint HTTP-server addr")
+	rootCmd.Flags().StringVarP(&httpAddress, "a", "a", srvCfg.DefaultHTTPAddress, "endpoint HTTP-server addr")
+	rootCmd.Flags().StringVarP(&grpcAddress, "g", "g", srvCfg.DefaultGRPCAddress, "endpoint GRPC-server addr")
 	rootCmd.Flags().IntVarP(&storeInterval, "i", "i", srvCfg.DefaultStoreInterval, "store interval in seconds (0 = sync)")
 	rootCmd.Flags().StringVarP(&fileStoragePath, "f", "f", srvCfg.DefaultFileStoragePath, "file to store metrics")
 	rootCmd.Flags().BoolVarP(&restoreOnStart, "r", "r", srvCfg.DefaultRestoreOnStart, "restore metrics from file on start")
@@ -70,7 +76,8 @@ func init() {
 func preRunE(cmd *cobra.Command, args []string) error {
 	var err error
 	opts, err = srvCfg.ParseOptionsFromCmdAndEnvs(cmd, &srvCfg.Options{
-		EndPointAddr:    endPointAddr,
+		HTTPAddress:     httpAddress,
+		GRPCAddress:     grpcAddress,
 		StoreInterval:   storeInterval,
 		FileStoragePath: fileStoragePath,
 		RestoreOnStart:  restoreOnStart,
@@ -80,7 +87,8 @@ func preRunE(cmd *cobra.Command, args []string) error {
 	})
 
 	opts = srvCfg.NewServerOptions(
-		srvCfg.WithAddress(opts.EndPointAddr),
+		srvCfg.WithAddress(opts.HTTPAddress),
+		srvCfg.WithGRPCAddress(opts.GRPCAddress),
 		srvCfg.WithStoreInterval(opts.StoreInterval),
 		srvCfg.WithFileStoragePath(opts.FileStoragePath),
 		srvCfg.WithRestoreOnStart(opts.RestoreOnStart),
@@ -112,30 +120,6 @@ func runE(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-
-	serverErrCh := make(chan error, 1)
-	go func() {
-		serverErrCh <- startServer(ctx, opts)
-	}()
-
-	select {
-	case sig := <-stop:
-		log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
-		cancel()
-		err := <-serverErrCh
-		return err
-	case err := <-serverErrCh:
-		return err
-	}
-}
-
-func startServer(ctx context.Context, opts *srvCfg.Options) error {
-	log.Info().
-		Str("address", opts.EndPointAddr).
-		Msg("Server configuration")
-
 	collector, err := colcfg.NewCollector(&colcfg.Params{
 		Ctx:  ctx,
 		Opts: opts,
@@ -158,10 +142,86 @@ func startServer(ctx context.Context, opts *srvCfg.Options) error {
 		pingUsecase = nil
 	}
 
-	r := router.NewRouter(server.NewServer(metricUsecase, pingUsecase), opts)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	g, gCtx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		select {
+		case <-gCtx.Done():
+			return gCtx.Err()
+		case sig := <-stop:
+			log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
+			cancel()
+		}
+
+		return nil
+	})
+
+	g.Go(func() error {
+		return startHTTPServer(gCtx, opts, metricUsecase, pingUsecase)
+	})
+
+	g.Go(func() error {
+		return startGRPCServer(gCtx, opts, metricUsecase, pingUsecase)
+	})
+
+	return g.Wait()
+}
+
+func startGRPCServer(ctx context.Context,
+	opts *srvCfg.Options,
+	metricUsecase *srvUsecase.MetricUsecase,
+	pingUsecase *ping.PingUsecase) error {
+
+	log.Info().
+		Str("address", opts.GRPCAddress).
+		Msg("Server configuration")
+
+	listener, err := net.Listen("tcp", opts.GRPCAddress)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to listen")
+		return fmt.Errorf("failed to listen: %w", err)
+	}
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterMetricsServiceServer(grpcServer, &pb.UnimplementedMetricsServiceServer{})
+
+	grpcErrCh := make(chan error, 1)
+
+	go func() {
+		log.Info().Msg("Starting GRPC server...")
+		if err := grpcServer.Serve(listener); err != nil {
+			log.Fatal().Err(err).Msg("GRPC server failed unexpectedly")
+			grpcErrCh <- err
+		}
+	}()
+
+	select {
+	case err := <-grpcErrCh:
+		return err
+	case <-ctx.Done():
+		grpcServer.GracefulStop()
+		log.Info().Msg("GRPC server gracefully stopped")
+	}
+
+	return nil
+}
+
+func startHTTPServer(ctx context.Context,
+	opts *srvCfg.Options,
+	metricUsecase *srvUsecase.MetricUsecase,
+	pingUsecase *ping.PingUsecase) error {
+
+	log.Info().
+		Str("address", opts.HTTPAddress).
+		Msg("Server configuration")
+
+	r := router.NewRouter(REST.NewServer(metricUsecase, pingUsecase), opts)
 
 	srv := &http.Server{
-		Addr:    opts.EndPointAddr,
+		Addr:    opts.HTTPAddress,
 		Handler: r,
 	}
 

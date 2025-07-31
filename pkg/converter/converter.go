@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	pb "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/grpc-metrics"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	"github.com/rs/zerolog/log"
 )
@@ -152,4 +153,46 @@ func ConvertToSerialization(src []models.Metric) ([]serialize.Metric, error) {
 	}
 
 	return converted, nil
+}
+
+func convertToProtoMetric(src models.Metric) *pb.Metric {
+	switch src.Type() {
+	case models.GaugeType:
+		value, ok := src.Value().(float64)
+		if !ok {
+			return nil
+		}
+		return &pb.Metric{
+			Id:       src.Name(),
+			MType:    src.Type(),
+			MetricValue: &pb.Metric_Value{
+				Value: value,
+			},
+		}
+
+	case models.CounterType:
+		delta, ok := src.Value().(int64)
+		if !ok {
+			return nil
+		}
+		return &pb.Metric{
+			Id:       src.Name(),
+			MType:    src.Type(),
+			MetricValue: &pb.Metric_Delta{
+				Delta: delta,
+			},
+		}
+	}
+
+	return nil
+}
+
+func ConvertToProtoMetrics(src []models.Metric) []*pb.Metric {
+	converted := make([]*pb.Metric, 0, len(src))
+
+	for _, m := range src {
+		converted = append(converted, convertToProtoMetric(m))
+	}
+
+	return converted
 }
