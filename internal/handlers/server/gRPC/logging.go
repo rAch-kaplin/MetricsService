@@ -25,22 +25,12 @@ func WithLogging(ctx context.Context,
 	duration := time.Since(start)
 	st := status.Convert(err)
 
-	if err == nil {
-		log.Info().
-			Str("grpc", "true").
-			Str("method", info.FullMethod).
-			Dur("duration", duration).
-			Int("status", int(st.Code())).
-			Msg("new request")
-	} else {
-		log.Error().
-			Err(err).
-			Str("grpc", "true").
-			Str("method", info.FullMethod).
-			Dur("duration", duration).
-			Int("status", int(st.Code())).
-			Msg("new request")
-	}
+	log.Info().
+		Str("grpc", "true").
+		Str("method", info.FullMethod).
+		Dur("duration", duration).
+		Int("status", int(st.Code())).
+		Msg("new request")
 
 	return response, err
 }
