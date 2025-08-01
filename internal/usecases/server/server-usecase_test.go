@@ -61,22 +61,22 @@ func TestServerUsecase_GetAllMetrics(t *testing.T) {
 	uc := server.NewMetricUsecase(mockMetricGetter, mockMetricUpdater, nil)
 
 	t.Run("TestServerUsecase_GetAllMetrics", func(t *testing.T) {
-		mockMetric_1 := modelsMocks.NewMockMetric(ctrl)
-		mockMetric_1.EXPECT().Name().Return("Alloc").AnyTimes()
-		mockMetric_1.EXPECT().Type().Return("gauge").AnyTimes()
-		mockMetric_1.EXPECT().Value().Return(124.2).AnyTimes()
+		mockMetric1 := modelsMocks.NewMockMetric(ctrl)
+		mockMetric1.EXPECT().Name().Return("Alloc").AnyTimes()
+		mockMetric1.EXPECT().Type().Return("gauge").AnyTimes()
+		mockMetric1.EXPECT().Value().Return(124.2).AnyTimes()
 
-		mockMetric_2 := modelsMocks.NewMockMetric(ctrl)
-		mockMetric_2.EXPECT().Name().Return("PollCount").AnyTimes()
-		mockMetric_2.EXPECT().Type().Return("counter").AnyTimes()
-		mockMetric_2.EXPECT().Value().Return(int64(100)).AnyTimes()
+		mockMetric2 := modelsMocks.NewMockMetric(ctrl)
+		mockMetric2.EXPECT().Name().Return("PollCount").AnyTimes()
+		mockMetric2.EXPECT().Type().Return("counter").AnyTimes()
+		mockMetric2.EXPECT().Value().Return(int64(100)).AnyTimes()
 
-		mockMetric_3 := modelsMocks.NewMockMetric(ctrl)
-		mockMetric_3.EXPECT().Name().Return("RandomValue").AnyTimes()
-		mockMetric_3.EXPECT().Type().Return("gauge").AnyTimes()
-		mockMetric_3.EXPECT().Value().Return(44.2).AnyTimes()
+		mockMetric3 := modelsMocks.NewMockMetric(ctrl)
+		mockMetric3.EXPECT().Name().Return("RandomValue").AnyTimes()
+		mockMetric3.EXPECT().Type().Return("gauge").AnyTimes()
+		mockMetric3.EXPECT().Value().Return(44.2).AnyTimes()
 
-		expectedMetrics := []models.Metric{mockMetric_1, mockMetric_2, mockMetric_3}
+		expectedMetrics := []models.Metric{mockMetric1, mockMetric2, mockMetric3}
 
 		mockMetricGetter.EXPECT().GetAllMetrics(ctx).Return(expectedMetrics, nil)
 
@@ -140,22 +140,22 @@ func TestServerUsecase_UpdateMetricList(t *testing.T) {
 	uc := server.NewMetricUsecase(mockMetricGetter, mockMetricUpdater, nil)
 
 	t.Run("TestServerUsecase_UpdateMetricList", func(t *testing.T) {
-		mockMetric_1 := modelsMocks.NewMockMetric(ctrl)
-		mockMetric_1.EXPECT().Name().Return("Alloc").AnyTimes()
-		mockMetric_1.EXPECT().Type().Return("gauge").AnyTimes()
-		mockMetric_1.EXPECT().Value().Return(124.2).AnyTimes()
+		mockMetric1 := modelsMocks.NewMockMetric(ctrl)
+		mockMetric1.EXPECT().Name().Return("Alloc").AnyTimes()
+		mockMetric1.EXPECT().Type().Return("gauge").AnyTimes()
+		mockMetric1.EXPECT().Value().Return(124.2).AnyTimes()
 
-		mockMetric_2 := modelsMocks.NewMockMetric(ctrl)
-		mockMetric_2.EXPECT().Name().Return("PollCount").AnyTimes()
-		mockMetric_2.EXPECT().Type().Return("counter").AnyTimes()
-		mockMetric_2.EXPECT().Value().Return(int64(100)).AnyTimes()
+		mockMetric2 := modelsMocks.NewMockMetric(ctrl)
+		mockMetric2.EXPECT().Name().Return("PollCount").AnyTimes()
+		mockMetric2.EXPECT().Type().Return("counter").AnyTimes()
+		mockMetric2.EXPECT().Value().Return(int64(100)).AnyTimes()
 
-		mockMetric_3 := modelsMocks.NewMockMetric(ctrl)
-		mockMetric_3.EXPECT().Name().Return("RandomValue").AnyTimes()
-		mockMetric_3.EXPECT().Type().Return("gauge").AnyTimes()
-		mockMetric_3.EXPECT().Value().Return(44.2).AnyTimes()
+		mockMetric3 := modelsMocks.NewMockMetric(ctrl)
+		mockMetric3.EXPECT().Name().Return("RandomValue").AnyTimes()
+		mockMetric3.EXPECT().Type().Return("gauge").AnyTimes()
+		mockMetric3.EXPECT().Value().Return(44.2).AnyTimes()
 
-		expectedMetrics := []models.Metric{mockMetric_1, mockMetric_2, mockMetric_3}
+		expectedMetrics := []models.Metric{mockMetric1, mockMetric2, mockMetric3}
 
 		mockMetricUpdater.EXPECT().UpdateMetricList(ctx, expectedMetrics).Return(nil)
 
