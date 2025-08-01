@@ -62,7 +62,9 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
@@ -247,6 +249,7 @@ func ConvertToGzipData(metrics serialize.MetricsList) (*bytes.Buffer, bool, erro
 		return nil, false, err
 	}
 
+	// if the metrics is less than 1024 bytes, we don't need to compress it
 	if jsonBuf.Len() <= 1024 {
 		return &jsonBuf, false, nil
 	}
@@ -321,19 +324,23 @@ func (ag *Agent) SendAllMetricsGRPC(ctx context.Context, client pb.MetricsServic
 
 	metricsToProto, err := converter.ConvertToProtoMetrics(allMetrics)
 	if err != nil {
+		_ = status.Errorf(codes.Internal, "failed to convert metrics to proto")
 		log.Error().Err(err).Msg("failed to convert metrics to proto")
+		return
 	}
 
 	data, err := proto.Marshal(&pb.UpdateMetricsRequest{
 		Metrics: metricsToProto,
 	})
 	if err != nil {
+		_ =status.Errorf(codes.Internal, "failed to marshal metrics to proto")
 		log.Error().Err(err).Msg("failed to marshal metrics to proto")
 		return
 	}
 
 	hashBytes, err := hash.GetHash([]byte(key), data)
 	if err != nil {
+		_ = status.Errorf(codes.Internal, "failed to get hash")
 		log.Error().Err(err).Msg("failed to get hash")
 		return
 	}
@@ -348,10 +355,13 @@ func (ag *Agent) SendAllMetricsGRPC(ctx context.Context, client pb.MetricsServic
 		Metrics: metricsToProto,
 	})
 	if err != nil {
+		_ = status.Errorf(codes.Internal, "failed to send metrics")
 		log.Error().Err(err).Msg("failed to send metrics")
+		return
 	}
 }
 
+// This func is used to send metrics to the server using gRPC
 func SendMetricsGRPC(ctx context.Context,
 	ag *Agent,
 	client pb.MetricsServiceClient,

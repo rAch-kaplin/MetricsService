@@ -37,6 +37,7 @@ import (
 	workerpool "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/worker-pool"
 )
 
+// Variables for the agent configuration
 var (
 	httpAddress    string
 	grpcAddress    string

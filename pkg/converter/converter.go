@@ -57,6 +57,11 @@ func ConvertToMetricTable(src []models.Metric) ([]models.MetricTable, error) {
 				return nil, fmt.Errorf("invalid metric value type: %s", mType)
 			}
 			valStr = strconv.FormatInt(val, 10)
+
+		default:
+			log.Error().Str("metric_name", mName).Str("metric_type", mType).
+				Msg("Unknown metric type")
+			return nil, fmt.Errorf("unknown metric type: %s", mType)
 		}
 
 		converted = append(converted, models.MetricTable{
