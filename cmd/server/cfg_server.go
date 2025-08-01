@@ -34,6 +34,7 @@ import (
 	colcfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/collector"
 	srvCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/server"
 	rest "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server/REST"
+	gRPC "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server/gRPC"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/router"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/ping"
 	srvUsecase "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/server"
@@ -185,7 +186,17 @@ func startGRPCServer(ctx context.Context,
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	grpcServer := grpc.NewServer()
+	interceptor := []grpc.UnaryServerInterceptor{
+		gRPC.WithLogging,
+		gRPC.WithTrustedSubnet(opts.TrustedSubnet),
+	}
+	if opts.Key != "" {
+		interceptor = append(interceptor, gRPC.WithHashing([]byte(opts.Key)))
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(interceptor...),
+	)
 	pb.RegisterMetricsServiceServer(grpcServer, &pb.UnimplementedMetricsServiceServer{})
 
 	grpcErrCh := make(chan error, 1)

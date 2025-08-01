@@ -62,16 +62,18 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/agent"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/converter"
+	pb "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/grpc-metrics"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/hash"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	rt "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/runtime-stats"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	worker "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/worker-pool"
-	pb "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/grpc-metrics"
 )
 
 type Agent struct {
@@ -311,7 +313,7 @@ func SendMetrics(ctx context.Context,
 
 }
 
-func (ag *Agent) SendAllMetricsGRPC(ctx context.Context, client pb.MetricsServiceClient) {
+func (ag *Agent) SendAllMetricsGRPC(ctx context.Context, client pb.MetricsServiceClient, key string) {
 	allMetrics, err := ag.Usecase.GetAllMetrics(ctx)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to Get metrics")
@@ -321,6 +323,26 @@ func (ag *Agent) SendAllMetricsGRPC(ctx context.Context, client pb.MetricsServic
 	if err != nil {
 		log.Error().Err(err).Msg("failed to convert metrics to proto")
 	}
+
+	data, err := proto.Marshal(&pb.UpdateMetricsRequest{
+		Metrics: metricsToProto,
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("failed to marshal metrics to proto")
+		return
+	}
+
+	hashBytes, err := hash.GetHash([]byte(key), data)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get hash")
+		return
+	}
+
+	h := hex.EncodeToString(hashBytes)
+
+	md := metadata.New(map[string]string{"HashSHA256": h})
+
+	ctx = metadata.NewOutgoingContext(ctx, md)
 
 	_, err = client.UpdateMetrics(ctx, &pb.UpdateMetricsRequest{
 		Metrics: metricsToProto,
@@ -334,7 +356,8 @@ func SendMetricsGRPC(ctx context.Context,
 	ag *Agent,
 	client pb.MetricsServiceClient,
 	wp *worker.WorkerPool,
-	reportInterval int) {
+	reportInterval int,
+	key string) {
 
 	ticker := time.NewTicker(time.Duration(reportInterval) * time.Second)
 	defer ticker.Stop()
@@ -345,7 +368,7 @@ func SendMetricsGRPC(ctx context.Context,
 			return
 		case <-ticker.C:
 			wp.AddTask(func(ctx context.Context) error {
-				ag.SendAllMetricsGRPC(ctx, client)
+				ag.SendAllMetricsGRPC(ctx, client, key)
 				return nil
 			})
 		}

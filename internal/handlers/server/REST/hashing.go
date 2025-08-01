@@ -79,6 +79,7 @@ func WithHashing(key []byte) func(next http.Handler) http.Handler {
 				}
 
 				next.ServeHTTP(hw, r)
+				return
 			}
 
 			next.ServeHTTP(w, r)

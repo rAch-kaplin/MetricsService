@@ -32,9 +32,9 @@ import (
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/agent"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	auc "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/agent"
+	pb "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/grpc-metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	workerpool "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/worker-pool"
-	pb "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/grpc-metrics"
 )
 
 var (
@@ -154,7 +154,7 @@ func startAgent(ctx context.Context) {
 
 	go func() {
 		defer wg.Done()
-		agent.SendMetricsGRPC(ctx, agentUsecase, grpcClient, wp, opts.ReportInterval)
+		agent.SendMetricsGRPC(ctx, agentUsecase, grpcClient, wp, opts.ReportInterval, opts.Key)
 	}()
 
 	<-ctx.Done()
