@@ -1,4 +1,4 @@
-package server
+package rest
 
 import (
 	"compress/gzip"
@@ -14,11 +14,15 @@ var supportedContentType = map[string]struct{}{
 	"text/html; charset=utf-8": {},
 }
 
+// gzipWriter wraps http.ResponseWriter and writes the response body
+// through a gzip.Writer if the response content type is supported.
 type gzipWriter struct {
 	http.ResponseWriter
 	Writer io.Writer
 }
 
+// Write compresses the response with gzip if the Content-Type is supported.
+// If not supported, it writes the response without compression.
 func (w *gzipWriter) Write(b []byte) (int, error) {
 	contentType := w.Header().Get("Content-Type")
 
@@ -31,6 +35,11 @@ func (w *gzipWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }
 
+// WithGzipCompress is an HTTP middleware that compresses server responses using gzip.
+//
+// If the client includes "gzip" in the Accept-Encoding header, and the response
+// has a supported Content-Type, the response body will be compressed using gzip.
+// Otherwise, the response is passed through uncompressed.
 func WithGzipCompress(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		encodingValues := req.Header.Values("Accept-Encoding")
