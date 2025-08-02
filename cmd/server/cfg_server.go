@@ -42,6 +42,7 @@ import (
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
+// Variables for the server configuration
 var (
 	httpAddress     string
 	grpcAddress     string
@@ -54,6 +55,7 @@ var (
 	opts            *srvCfg.Options
 )
 
+// Root command for the server
 var rootCmd = &cobra.Command{
 	Use:     "server",
 	Short:   "MetricService",
@@ -121,6 +123,7 @@ func runE(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Create a collector for metrics depending on which type of storage is used (file, database, memory).
 	collector, err := colcfg.NewCollector(&colcfg.Params{
 		Ctx:  ctx,
 		Opts: opts,
@@ -134,8 +137,10 @@ func runE(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	// Create a use case for metrics, business logic for metrics.
 	metricUsecase := srvUsecase.NewMetricUsecase(collector, collector, collector)
 
+	// Create a use case for ping if the collector implements the Pinger interface.
 	var pingUsecase *ping.PingUsecase
 	if pinger, ok := collector.(ping.Pinger); ok {
 		pingUsecase = ping.NewPingUsecase(pinger)
@@ -143,11 +148,15 @@ func runE(cmd *cobra.Command, args []string) error {
 		pingUsecase = nil
 	}
 
+	// Create a channel for the shutdown signal.
 	stop := make(chan os.Signal, 1)
+	// Notify the server about the shutdown signal.
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
+	// Create a context for the server.
 	g, gCtx := errgroup.WithContext(ctx)
 
+	// Create a goroutine for the server, which will wait for the shutdown signal.
 	g.Go(func() error {
 		select {
 		case <-gCtx.Done():
@@ -160,10 +169,12 @@ func runE(cmd *cobra.Command, args []string) error {
 		return nil
 	})
 
+	// Create a goroutine for the HTTP server.
 	g.Go(func() error {
 		return startHTTPServer(gCtx, opts, metricUsecase, pingUsecase)
 	})
 
+	// Create a goroutine for the GRPC server.
 	g.Go(func() error {
 		return startGRPCServer(gCtx, opts, metricUsecase, pingUsecase)
 	})

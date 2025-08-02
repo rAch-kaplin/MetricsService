@@ -26,6 +26,9 @@ func (res *loggingResponseWriter) Write(body []byte) (int, error) {
 	return size, err
 }
 
+// WithLogging is an HTTP middleware that logs the request and response.
+//
+// It logs the URI, method, status, duration, and size of the request.
 func WithLogging(h http.Handler) http.Handler {
 	logfn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

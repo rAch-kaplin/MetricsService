@@ -11,12 +11,17 @@ import (
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 )
 
+// hashResponseWriter wraps http.ResponseWriter and buffers the response body
+// to calculate and set an HMAC-SHA256 hash of the full response.
 type hashResponseWriter struct {
 	http.ResponseWriter
 	body *bytes.Buffer
 	key  []byte
 }
 
+// Write stores the written data in an internal buffer, calculates a new
+// HMAC-SHA256 hash of the accumulated response body (if a key is provided),
+// sets it as the "HashSHA256" header, and writes the data to the client.
 func (hsw *hashResponseWriter) Write(b []byte) (int, error) {
 	if size, err := hsw.body.Write(b); err != nil {
 		return size, fmt.Errorf("failed write body %v", err)
@@ -42,6 +47,16 @@ func (hsw *hashResponseWriter) Write(b []byte) (int, error) {
 	return n, nil
 }
 
+// WithHashing returns an HTTP middleware that verifies request integrity and
+// attaches a response hash.
+//
+// For incoming requests: if the "HashSHA256" header is present, the middleware
+// checks that it matches the hash of the request body; otherwise, it rejects
+// the request with 400 Bad Request.
+//
+// For outgoing responses: if a key is provided, the middleware calculates
+// an HMAC-SHA256 hash of the response body and sets it as the "HashSHA256"
+// header.
 func WithHashing(key []byte) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

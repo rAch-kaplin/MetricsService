@@ -14,12 +14,18 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// Server provides the gRPC implementation of the MetricsServiceServer.
+//
+// This struct acts as a bridge between the gRPC layer and the application
+// business logic (use cases). It embeds pb.UnimplementedMetricsServiceServer
+// so that you only need to implement the RPC methods that are actually used.
 type Server struct {
 	pb.UnimplementedMetricsServiceServer
 	MetricUsecase *srvUsecase.MetricUsecase
 	PingUsecase   *ping.PingUsecase
 }
 
+// NewServer creates a new Server with the given use cases.
 func NewServer(uc *srvUsecase.MetricUsecase, puc *ping.PingUsecase) *Server {
 	return &Server{
 		MetricUsecase: uc,
@@ -27,6 +33,11 @@ func NewServer(uc *srvUsecase.MetricUsecase, puc *ping.PingUsecase) *Server {
 	}
 }
 
+// GetMetric implements the GetMetric RPC method.
+//
+// It retrieves a single metric by its type and name, converts it to a protobuf
+// message, and returns it. If the metric is not found, it returns a NotFound
+// error. If there is an internal error, it returns an Internal error.
 func (s *Server) GetMetric(ctx context.Context, req *pb.GetMetricRequest) (*pb.GetMetricResponse, error) {
 	metric, err := s.MetricUsecase.GetMetric(ctx, req.Type, req.Id)
 	if err != nil {
@@ -45,6 +56,11 @@ func (s *Server) GetMetric(ctx context.Context, req *pb.GetMetricRequest) (*pb.G
 	}, nil
 }
 
+// GetAllMetrics implements the GetAllMetrics RPC method.
+//
+// It retrieves all metrics from the use case, converts them to protobuf
+// messages, and returns them. If there is an internal error, it returns an
+// Internal error.
 func (s *Server) GetAllMetrics(ctx context.Context) (*pb.GetAllMetricsResponse, error) {
 	metrics, err := s.MetricUsecase.GetAllMetrics(ctx)
 	if err != nil {
@@ -63,6 +79,10 @@ func (s *Server) GetAllMetrics(ctx context.Context) (*pb.GetAllMetricsResponse, 
 	}, nil
 }
 
+// UpdateMetric implements the UpdateMetric RPC method.
+//
+// It updates a single metric by its type and name.
+// If there is an internal error, it returns an Internal error.
 func (s *Server) UpdateMetric(ctx context.Context, req *pb.UpdateMetricRequest) (*emptypb.Empty, error) {
 	metric := req.Metric
 
@@ -77,6 +97,10 @@ func (s *Server) UpdateMetric(ctx context.Context, req *pb.UpdateMetricRequest) 
 	return &emptypb.Empty{}, nil
 }
 
+// UpdateMetrics implements the UpdateMetrics RPC method.
+//
+// It updates a list of metrics.
+// If there is an internal error, it returns an Internal error.
 func (s *Server) UpdateMetrics(ctx context.Context, req *pb.UpdateMetricsRequest) (*emptypb.Empty, error) {
 	protoMetrics := req.Metrics
 
@@ -98,6 +122,10 @@ func (s *Server) UpdateMetrics(ctx context.Context, req *pb.UpdateMetricsRequest
 	return &emptypb.Empty{}, nil
 }
 
+// PingHandler implements the PingHandler RPC method.
+//
+// It checks if the database is reachable.
+// If there is an internal error, it returns an Internal error.
 func (s *Server) PingHandler(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	if err := s.PingUsecase.Check(ctx); err != nil {
 		log.Error().Err(err).Msg("failed to ping")

@@ -11,6 +11,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// WithTrustedSubnet is a function that checks if the incoming request is from a trusted subnet.
+//
+// It parses the trusted subnet from the configuration, creates a subnet object,
+// and returns a grpc.UnaryServerInterceptor that checks if the incoming request
+// is from a trusted subnet. If the trusted subnet is not set, it returns a nil
+// interceptor.
 func WithTrustedSubnet(trustedSubnet string) grpc.UnaryServerInterceptor {
 	var subnet *net.IPNet
 

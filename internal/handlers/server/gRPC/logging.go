@@ -9,6 +9,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// WithLogging is a function that logs the incoming request and the response.
+//
+// It logs the method, duration, and status of the request.
 func WithLogging(ctx context.Context,
 	req any,
 	info *grpc.UnaryServerInfo,

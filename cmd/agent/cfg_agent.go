@@ -48,6 +48,7 @@ var (
 	opts           *agCfg.Options
 )
 
+// Root command for the agent
 var rootCmd = &cobra.Command{
 	Use:     "agent",
 	Short:   "MetricService",
@@ -104,45 +105,59 @@ func runE(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Create a channel for the shutdown signal.
 	stop := make(chan os.Signal, 1)
+	// Notify the agent about the shutdown signal.
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
+	// Create a goroutine for the agent, which will wait for the shutdown signal.
 	go func() {
 		<-stop
 		cancel()
 	}()
 
+	// startAgent is a function that starts the agent.
+	// It creating use case for metrics,
+	// initializing the http and grpc clients, storage, worker pool, and starting the agent.
 	startAgent(ctx)
 
 	return nil
 }
 
 func startAgent(ctx context.Context) {
+	// Create a memory storage for the agent.
 	metricStorage := repo.NewMemStorage()
+	// Create a use case for the agent.
 	agentUsecase := agent.NewAgent(auc.NewAgentUsecase(metricStorage, metricStorage))
 
+	// Create a http client for the agent.
 	client := resty.New().
 		SetTimeout(5 * time.Second).
 		SetBaseURL("http://" + opts.HTTPAddress)
 
+	// Create a worker pool for the agent.
 	wp := workerpool.New(opts.RateLimit)
 
+	// Start the worker pool.
 	wp.Start(ctx)
 	defer wp.Wait()
 
 	var wg sync.WaitGroup
 	wg.Add(3)
 
+	// Create a goroutine for the agent, which will collect metrics.
 	go func() {
 		defer wg.Done()
 		agent.CollectMetrics(ctx, agentUsecase, opts.PollInterval)
 	}()
 
+	// Create a goroutine for the agent, which will send metrics to the server.
 	go func() {
 		defer wg.Done()
 		agent.SendMetrics(ctx, agentUsecase, client, wp, opts.ReportInterval, opts.Key)
 	}()
 
+	// Create a connection to the GRPC server.
 	conn, err := grpc.NewClient(opts.GRPCAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to connect to GRPC server")
@@ -151,15 +166,19 @@ func startAgent(ctx context.Context) {
 		_ = conn.Close()
 	}()
 
+	// Create a grpc client for the agent.
 	grpcClient := pb.NewMetricsServiceClient(conn)
 
+	// Create a goroutine for the agent, which will send metrics to the GRPC server.
 	go func() {
 		defer wg.Done()
 		agent.SendMetricsGRPC(ctx, agentUsecase, grpcClient, wp, opts.ReportInterval, opts.Key)
 	}()
 
+	// Wait for the shutdown signal.
 	<-ctx.Done()
 
+	// Wait for the agent to finish.
 	wg.Wait()
 
 	log.Info().Msg("Agent stopped gracefully.")
