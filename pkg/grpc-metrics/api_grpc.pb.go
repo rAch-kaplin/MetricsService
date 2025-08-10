@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v3.12.4
-// source: metrics.proto
+// source: api.proto
 
 package grpc_metrics
 
@@ -270,5 +270,5 @@ var MetricsService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "metrics.proto",
+	Metadata: "api.proto",
 }

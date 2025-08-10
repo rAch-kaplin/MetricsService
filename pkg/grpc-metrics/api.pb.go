@@ -2,17 +2,19 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v3.12.4
-// source: metrics.proto
+// source: api.proto
 
 package grpc_metrics
 
 import (
-	empty "github.com/golang/protobuf/ptypes/empty"
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	empty "github.com/golang/protobuf/ptypes/empty"
+	_ "google.golang.org/genproto/googleapis/api/annotations"
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -37,7 +39,7 @@ type Metric struct {
 
 func (x *Metric) Reset() {
 	*x = Metric{}
-	mi := &file_metrics_proto_msgTypes[0]
+	mi := &file_api_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -49,7 +51,7 @@ func (x *Metric) String() string {
 func (*Metric) ProtoMessage() {}
 
 func (x *Metric) ProtoReflect() protoreflect.Message {
-	mi := &file_metrics_proto_msgTypes[0]
+	mi := &file_api_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -62,7 +64,7 @@ func (x *Metric) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Metric.ProtoReflect.Descriptor instead.
 func (*Metric) Descriptor() ([]byte, []int) {
-	return file_metrics_proto_rawDescGZIP(), []int{0}
+	return file_api_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Metric) GetId() string {
@@ -130,7 +132,7 @@ type GetMetricRequest struct {
 
 func (x *GetMetricRequest) Reset() {
 	*x = GetMetricRequest{}
-	mi := &file_metrics_proto_msgTypes[1]
+	mi := &file_api_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -142,7 +144,7 @@ func (x *GetMetricRequest) String() string {
 func (*GetMetricRequest) ProtoMessage() {}
 
 func (x *GetMetricRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_metrics_proto_msgTypes[1]
+	mi := &file_api_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -155,7 +157,7 @@ func (x *GetMetricRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMetricRequest.ProtoReflect.Descriptor instead.
 func (*GetMetricRequest) Descriptor() ([]byte, []int) {
-	return file_metrics_proto_rawDescGZIP(), []int{1}
+	return file_api_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetMetricRequest) GetId() string {
@@ -181,7 +183,7 @@ type GetMetricResponse struct {
 
 func (x *GetMetricResponse) Reset() {
 	*x = GetMetricResponse{}
-	mi := &file_metrics_proto_msgTypes[2]
+	mi := &file_api_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -193,7 +195,7 @@ func (x *GetMetricResponse) String() string {
 func (*GetMetricResponse) ProtoMessage() {}
 
 func (x *GetMetricResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_metrics_proto_msgTypes[2]
+	mi := &file_api_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -206,7 +208,7 @@ func (x *GetMetricResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMetricResponse.ProtoReflect.Descriptor instead.
 func (*GetMetricResponse) Descriptor() ([]byte, []int) {
-	return file_metrics_proto_rawDescGZIP(), []int{2}
+	return file_api_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetMetricResponse) GetMetric() *Metric {
@@ -225,7 +227,7 @@ type GetAllMetricsResponse struct {
 
 func (x *GetAllMetricsResponse) Reset() {
 	*x = GetAllMetricsResponse{}
-	mi := &file_metrics_proto_msgTypes[3]
+	mi := &file_api_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -237,7 +239,7 @@ func (x *GetAllMetricsResponse) String() string {
 func (*GetAllMetricsResponse) ProtoMessage() {}
 
 func (x *GetAllMetricsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_metrics_proto_msgTypes[3]
+	mi := &file_api_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -250,7 +252,7 @@ func (x *GetAllMetricsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAllMetricsResponse.ProtoReflect.Descriptor instead.
 func (*GetAllMetricsResponse) Descriptor() ([]byte, []int) {
-	return file_metrics_proto_rawDescGZIP(), []int{3}
+	return file_api_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetAllMetricsResponse) GetMetrics() []*Metric {
@@ -269,7 +271,7 @@ type UpdateMetricRequest struct {
 
 func (x *UpdateMetricRequest) Reset() {
 	*x = UpdateMetricRequest{}
-	mi := &file_metrics_proto_msgTypes[4]
+	mi := &file_api_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -281,7 +283,7 @@ func (x *UpdateMetricRequest) String() string {
 func (*UpdateMetricRequest) ProtoMessage() {}
 
 func (x *UpdateMetricRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_metrics_proto_msgTypes[4]
+	mi := &file_api_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -294,7 +296,7 @@ func (x *UpdateMetricRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMetricRequest.ProtoReflect.Descriptor instead.
 func (*UpdateMetricRequest) Descriptor() ([]byte, []int) {
-	return file_metrics_proto_rawDescGZIP(), []int{4}
+	return file_api_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UpdateMetricRequest) GetMetric() *Metric {
@@ -313,7 +315,7 @@ type UpdateMetricsRequest struct {
 
 func (x *UpdateMetricsRequest) Reset() {
 	*x = UpdateMetricsRequest{}
-	mi := &file_metrics_proto_msgTypes[5]
+	mi := &file_api_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -325,7 +327,7 @@ func (x *UpdateMetricsRequest) String() string {
 func (*UpdateMetricsRequest) ProtoMessage() {}
 
 func (x *UpdateMetricsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_metrics_proto_msgTypes[5]
+	mi := &file_api_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -338,7 +340,7 @@ func (x *UpdateMetricsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMetricsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateMetricsRequest) Descriptor() ([]byte, []int) {
-	return file_metrics_proto_rawDescGZIP(), []int{5}
+	return file_api_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UpdateMetricsRequest) GetMetrics() []*Metric {
@@ -348,11 +350,11 @@ func (x *UpdateMetricsRequest) GetMetrics() []*Metric {
 	return nil
 }
 
-var File_metrics_proto protoreflect.FileDescriptor
+var File_api_proto protoreflect.FileDescriptor
 
-const file_metrics_proto_rawDesc = "" +
+const file_api_proto_rawDesc = "" +
 	"\n" +
-	"\rmetrics.proto\x12\rMetricsServer\x1a\x1bgoogle/protobuf/empty.proto\"o\n" +
+	"\tapi.proto\x12\rMetricsServer\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cgoogle/api/annotations.proto\"o\n" +
 	"\x06Metric\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x15\n" +
 	"\x06m_type\x18\x02 \x01(\tR\x05mType\x12\x16\n" +
@@ -369,28 +371,29 @@ const file_metrics_proto_rawDesc = "" +
 	"\x13UpdateMetricRequest\x12-\n" +
 	"\x06metric\x18\x01 \x01(\v2\x15.MetricsServer.MetricR\x06metric\"G\n" +
 	"\x14UpdateMetricsRequest\x12/\n" +
-	"\ametrics\x18\x01 \x03(\v2\x15.MetricsServer.MetricR\ametrics2\x81\x03\n" +
-	"\x0eMetricsService\x12N\n" +
-	"\tGetMetric\x12\x1f.MetricsServer.GetMetricRequest\x1a .MetricsServer.GetMetricResponse\x12M\n" +
-	"\rGetAllMetrics\x12\x16.google.protobuf.Empty\x1a$.MetricsServer.GetAllMetricsResponse\x12J\n" +
-	"\fUpdateMetric\x12\".MetricsServer.UpdateMetricRequest\x1a\x16.google.protobuf.Empty\x12L\n" +
-	"\rUpdateMetrics\x12#.MetricsServer.UpdateMetricsRequest\x1a\x16.google.protobuf.Empty\x126\n" +
-	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.EmptyB\x12Z\x10pkg/grpc-metricsb\x06proto3"
+	"\ametrics\x18\x01 \x03(\v2\x15.MetricsServer.MetricR\ametrics2\xb0\x04\n" +
+	"\x0eMetricsService\x12q\n" +
+	"\tGetMetric\x12\x1f.MetricsServer.GetMetricRequest\x1a .MetricsServer.GetMetricResponse\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/value/{type}/{id}\x12_\n" +
+	"\rGetAllMetrics\x12\x16.google.protobuf.Empty\x1a$.MetricsServer.GetAllMetricsResponse\"\x10\x82\xd3\xe4\x93\x02\n" +
+	"\x12\b/api/v1/\x12\x90\x01\n" +
+	"\fUpdateMetric\x12\".MetricsServer.UpdateMetricRequest\x1a\x16.google.protobuf.Empty\"D\x82\xd3\xe4\x93\x02>:\x01*\"9/api/v1/update/{metric.m_type}/{metric.id}/{metric_value}\x12i\n" +
+	"\rUpdateMetrics\x12#.MetricsServer.UpdateMetricsRequest\x1a\x16.google.protobuf.Empty\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/updates/\x12L\n" +
+	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\x14\x82\xd3\xe4\x93\x02\x0e\x12\f/api/v1/pingB\x12Z\x10pkg/grpc-metricsb\x06proto3"
 
 var (
-	file_metrics_proto_rawDescOnce sync.Once
-	file_metrics_proto_rawDescData []byte
+	file_api_proto_rawDescOnce sync.Once
+	file_api_proto_rawDescData []byte
 )
 
-func file_metrics_proto_rawDescGZIP() []byte {
-	file_metrics_proto_rawDescOnce.Do(func() {
-		file_metrics_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_metrics_proto_rawDesc), len(file_metrics_proto_rawDesc)))
+func file_api_proto_rawDescGZIP() []byte {
+	file_api_proto_rawDescOnce.Do(func() {
+		file_api_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_api_proto_rawDesc), len(file_api_proto_rawDesc)))
 	})
-	return file_metrics_proto_rawDescData
+	return file_api_proto_rawDescData
 }
 
-var file_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
-var file_metrics_proto_goTypes = []any{
+var file_api_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_api_proto_goTypes = []any{
 	(*Metric)(nil),                // 0: MetricsServer.Metric
 	(*GetMetricRequest)(nil),      // 1: MetricsServer.GetMetricRequest
 	(*GetMetricResponse)(nil),     // 2: MetricsServer.GetMetricResponse
@@ -399,7 +402,7 @@ var file_metrics_proto_goTypes = []any{
 	(*UpdateMetricsRequest)(nil),  // 5: MetricsServer.UpdateMetricsRequest
 	(*empty.Empty)(nil),           // 6: google.protobuf.Empty
 }
-var file_metrics_proto_depIdxs = []int32{
+var file_api_proto_depIdxs = []int32{
 	0, // 0: MetricsServer.GetMetricResponse.metric:type_name -> MetricsServer.Metric
 	0, // 1: MetricsServer.GetAllMetricsResponse.metrics:type_name -> MetricsServer.Metric
 	0, // 2: MetricsServer.UpdateMetricRequest.metric:type_name -> MetricsServer.Metric
@@ -421,12 +424,12 @@ var file_metrics_proto_depIdxs = []int32{
 	0, // [0:4] is the sub-list for field type_name
 }
 
-func init() { file_metrics_proto_init() }
-func file_metrics_proto_init() {
-	if File_metrics_proto != nil {
+func init() { file_api_proto_init() }
+func file_api_proto_init() {
+	if File_api_proto != nil {
 		return
 	}
-	file_metrics_proto_msgTypes[0].OneofWrappers = []any{
+	file_api_proto_msgTypes[0].OneofWrappers = []any{
 		(*Metric_Delta)(nil),
 		(*Metric_Value)(nil),
 	}
@@ -434,17 +437,17 @@ func file_metrics_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_metrics_proto_rawDesc), len(file_metrics_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_rawDesc), len(file_api_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_metrics_proto_goTypes,
-		DependencyIndexes: file_metrics_proto_depIdxs,
-		MessageInfos:      file_metrics_proto_msgTypes,
+		GoTypes:           file_api_proto_goTypes,
+		DependencyIndexes: file_api_proto_depIdxs,
+		MessageInfos:      file_api_proto_msgTypes,
 	}.Build()
-	File_metrics_proto = out.File
-	file_metrics_proto_goTypes = nil
-	file_metrics_proto_depIdxs = nil
+	File_api_proto = out.File
+	file_api_proto_goTypes = nil
+	file_api_proto_depIdxs = nil
 }
