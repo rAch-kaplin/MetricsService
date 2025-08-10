@@ -7,6 +7,7 @@
 // -r, --r bool     restore metrics from file on start (default true)
 // -d, --d string   database dsn (default "")
 // -k, --k string   key for hash (default "")
+// -t, --t string   trusted subnet (default "")
 //
 // Author rAch-kaplin
 // Version 1.0.0
@@ -43,6 +44,7 @@ var (
 	restoreOnStart  bool
 	dataBaseDSN     string
 	key             string
+	trustedSubnet   string
 	opts            *srvCfg.Options
 )
 
@@ -62,6 +64,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&restoreOnStart, "r", "r", srvCfg.DefaultRestoreOnStart, "restore metrics from file on start")
 	rootCmd.Flags().StringVarP(&dataBaseDSN, "d", "d", srvCfg.DefaultDataBaseDSN, "database dsn")
 	rootCmd.Flags().StringVarP(&key, "k", "k", srvCfg.DefaultKey, "key for hash")
+	rootCmd.Flags().StringVarP(&trustedSubnet, "t", "t", srvCfg.DefaultTrustedSubnet, "trusted subnet")
 }
 
 func preRunE(cmd *cobra.Command, args []string) error {
@@ -72,7 +75,9 @@ func preRunE(cmd *cobra.Command, args []string) error {
 		FileStoragePath: fileStoragePath,
 		RestoreOnStart:  restoreOnStart,
 		DataBaseDSN:     dataBaseDSN,
-		Key:             key})
+		Key:             key,
+		TrustedSubnet:   trustedSubnet,
+	})
 
 	opts = srvCfg.NewServerOptions(
 		srvCfg.WithAddress(opts.EndPointAddr),
@@ -81,6 +86,7 @@ func preRunE(cmd *cobra.Command, args []string) error {
 		srvCfg.WithRestoreOnStart(opts.RestoreOnStart),
 		srvCfg.WithDataBaseDSN(opts.DataBaseDSN),
 		srvCfg.WithKey(opts.Key),
+		srvCfg.WithTrustedSubnet(opts.TrustedSubnet),
 	)
 
 	return err
