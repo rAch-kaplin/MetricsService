@@ -87,7 +87,7 @@ func runE(cmd *cobra.Command, args []string) error {
 
 	go func() {
 		fmt.Println("pprof listening on :6060")
-		http.ListenAndServe("localhost:6060", nil)
+		_ = http.ListenAndServe("localhost:6060", nil)
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())

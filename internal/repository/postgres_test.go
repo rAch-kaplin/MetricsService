@@ -20,7 +20,9 @@ func TestDatabase_GetMetric(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	repo := &repo.Database{
 		DB: db,
@@ -139,7 +141,9 @@ func TestDatabase_GetAllMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	repo := &repo.Database{
 		DB: db,
@@ -214,7 +218,9 @@ func TestDatabase_UpdateMetric(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create sqlmock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	repo := &repo.Database{
 		DB: db,
