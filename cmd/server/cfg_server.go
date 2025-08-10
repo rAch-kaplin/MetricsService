@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	rkgrpc "github.com/rookie-ninja/rk-grpc/v2/boot"
 
 	colcfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/collector"
 	srvCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/server"
@@ -182,6 +184,20 @@ func runE(cmd *cobra.Command, args []string) error {
 	return g.Wait()
 }
 
+func extractPort(addr string) uint64 {
+	_, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to SplitHostPort")
+	}
+
+	port, err := strconv.ParseUint(portStr, 10, 64)
+	if err != nil {
+		log.Error().Err(err).Msg("failed ParseUint")
+	}
+
+	return port
+}
+
 func startGRPCServer(ctx context.Context,
 	opts *srvCfg.Options,
 	metricUsecase *srvUsecase.MetricUsecase,
@@ -191,44 +207,33 @@ func startGRPCServer(ctx context.Context,
 		Str("address", opts.GRPCAddress).
 		Msg("Server configuration")
 
-	listener, err := net.Listen("tcp", opts.GRPCAddress)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to listen")
-		return fmt.Errorf("failed to listen: %w", err)
-	}
-
 	interceptor := []grpc.UnaryServerInterceptor{
 		gRPC.WithLogging,
 		gRPC.WithTrustedSubnet(opts.TrustedSubnet),
 	}
+
 	if opts.Key != "" {
 		interceptor = append(interceptor, gRPC.WithHashing([]byte(opts.Key)))
 	}
 
-	grpcServer := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(interceptor...),
+	grpcEntry := rkgrpc.RegisterGrpcEntry(
+		rkgrpc.WithName("grpc-server"),
+		rkgrpc.WithPort(extractPort(opts.GRPCAddress)),
+		rkgrpc.WithServerOptions(
+			grpc.ChainUnaryInterceptor(interceptor...),
+		),
 	)
-	pb.RegisterMetricsServiceServer(grpcServer, &pb.UnimplementedMetricsServiceServer{})
 
-	grpcErrCh := make(chan error, 1)
+	grpcEntry.AddRegFuncGrpc(func(server *grpc.Server) {
+        pb.RegisterMetricsServiceServer(server, &pb.UnimplementedMetricsServiceServer{})
+    })
 
-	go func() {
-		log.Info().Msg("Starting GRPC server...")
-		if err := grpcServer.Serve(listener); err != nil {
-			log.Fatal().Err(err).Msg("GRPC server failed unexpectedly")
-			grpcErrCh <- err
-		}
-	}()
+	go grpcEntry.Bootstrap(context.Background())
 
-	select {
-	case err := <-grpcErrCh:
-		return err
-	case <-ctx.Done():
-		grpcServer.GracefulStop()
-		log.Info().Msg("GRPC server gracefully stopped")
-	}
+    <-ctx.Done()
+    grpcEntry.Interrupt(context.Background())
 
-	return nil
+    return nil
 }
 
 func startHTTPServer(ctx context.Context,
