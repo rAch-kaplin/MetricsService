@@ -12,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	srvCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/server"
-	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server"
+	rest "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/server/REST"
 )
 
 // NewRouter creates and returns a new HTTP router configured with all routes and middleware.
@@ -35,15 +35,15 @@ import (
 //
 // Returns:
 // - http.Handler
-func NewRouter(srv *server.Server, opts *srvCfg.Options) http.Handler {
+func NewRouter(srv *rest.Server, opts *srvCfg.Options) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(server.WithLogging)
-	r.Use(server.WithGzipCompress)
-	r.Use(server.WithTrustedSubnet(opts.TrustedSubnet))
+	r.Use(rest.WithLogging)
+	r.Use(rest.WithGzipCompress)
+	r.Use(rest.WithTrustedSubnet(opts.TrustedSubnet))
 
 	if opts.Key != "" {
-		r.Use(server.WithHashing([]byte(opts.Key)))
+		r.Use(rest.WithHashing([]byte(opts.Key)))
 	}
 
 	r.Route("/", func(r chi.Router) {

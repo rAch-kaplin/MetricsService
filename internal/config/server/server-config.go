@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	DefaultEndpoint        = "localhost:8080"
+	DefaultHTTPAddress     = "localhost:8080"
+	DefaultGRPCAddress     = "localhost:8081"
 	DefaultStoreInterval   = 300
 	DefaultFileStoragePath = ""
 	DefaultRestoreOnStart  = true
@@ -20,7 +21,8 @@ const (
 )
 
 type Options struct {
-	EndPointAddr    string
+	HTTPAddress     string
+	GRPCAddress     string
 	StoreInterval   int
 	FileStoragePath string
 	RestoreOnStart  bool
@@ -31,6 +33,7 @@ type Options struct {
 
 type EnvConfig struct {
 	EndPointAddr    string `env:"ADDRESS"`
+	GRPCAddress     string `env:"GRPC_ADDRESS"`
 	StoreInterval   int    `env:"STORE_INTERVAL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	RestoreOnStart  bool   `env:"RESTORE"`
@@ -43,7 +46,8 @@ type Option func(*Options)
 
 func NewServerOptions(options ...Option) *Options {
 	opts := &Options{
-		EndPointAddr:    DefaultEndpoint,
+		HTTPAddress:     DefaultHTTPAddress,
+		GRPCAddress:     DefaultGRPCAddress,
 		StoreInterval:   DefaultStoreInterval,
 		FileStoragePath: DefaultFileStoragePath,
 		RestoreOnStart:  DefaultRestoreOnStart,
@@ -61,7 +65,13 @@ func NewServerOptions(options ...Option) *Options {
 
 func WithAddress(addr string) Option {
 	return func(o *Options) {
-		o.EndPointAddr = addr
+		o.HTTPAddress = addr
+	}
+}
+
+func WithGRPCAddress(addr string) Option {
+	return func(o *Options) {
+		o.GRPCAddress = addr
 	}
 }
 
@@ -111,8 +121,8 @@ func ParseOptionsFromCmdAndEnvs(cmd *cobra.Command, src *Options) (*Options, err
 		return nil, err
 	}
 
-	if _, _, err := net.SplitHostPort(opts.EndPointAddr); err != nil {
-		return nil, fmt.Errorf("invalid address %s: %w", opts.EndPointAddr, err)
+	if _, _, err := net.SplitHostPort(opts.HTTPAddress); err != nil {
+		return nil, fmt.Errorf("invalid address %s: %w", opts.HTTPAddress, err)
 	}
 
 	return opts, nil
@@ -125,7 +135,10 @@ func ParseFlags(cmd *cobra.Command, src *Options) (*Options, error) {
 		opts.DataBaseDSN = src.DataBaseDSN
 	}
 	if cmd.Flags().Changed("a") {
-		opts.EndPointAddr = src.EndPointAddr
+		opts.HTTPAddress = src.HTTPAddress
+	}
+	if cmd.Flags().Changed("g") {
+		opts.GRPCAddress = src.GRPCAddress
 	}
 	if cmd.Flags().Changed("i") {
 		if src.StoreInterval < 0 {
@@ -168,8 +181,12 @@ func ParseEnvs(cmd *cobra.Command, opts *Options) error {
 	}
 
 	if envCfg.EndPointAddr != "" {
-		opts.EndPointAddr = envCfg.EndPointAddr
+		opts.HTTPAddress = envCfg.EndPointAddr
 	}
+	if envCfg.GRPCAddress != "" {
+		opts.GRPCAddress = envCfg.GRPCAddress
+	}
+
 	if envCfg.StoreInterval > 0 {
 		opts.StoreInterval = envCfg.StoreInterval
 	}

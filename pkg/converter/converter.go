@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/models"
+	pb "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/grpc-metrics"
 	serialize "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/serialization"
 	"github.com/rs/zerolog/log"
 )
@@ -56,6 +57,11 @@ func ConvertToMetricTable(src []models.Metric) ([]models.MetricTable, error) {
 				return nil, fmt.Errorf("invalid metric value type: %s", mType)
 			}
 			valStr = strconv.FormatInt(val, 10)
+
+		default:
+			log.Error().Str("metric_name", mName).Str("metric_type", mType).
+				Msg("Unknown metric type")
+			return nil, fmt.Errorf("unknown metric type: %s", mType)
 		}
 
 		converted = append(converted, models.MetricTable{
@@ -148,6 +154,90 @@ func ConvertToSerialization(src []models.Metric) ([]serialize.Metric, error) {
 			return nil, fmt.Errorf("metric failed convert %+v", mtr)
 		}
 
+		converted = append(converted, metric)
+	}
+
+	return converted, nil
+}
+
+func convertToProtoMetric(src models.Metric) *pb.Metric {
+	switch src.Type() {
+	case models.GaugeType:
+		value, ok := src.Value().(float64)
+		if !ok {
+			return nil
+		}
+		return &pb.Metric{
+			Id:    src.Name(),
+			MType: src.Type(),
+			MetricValue: &pb.Metric_Value{
+				Value: value,
+			},
+		}
+
+	case models.CounterType:
+		delta, ok := src.Value().(int64)
+		if !ok {
+			return nil
+		}
+		return &pb.Metric{
+			Id:    src.Name(),
+			MType: src.Type(),
+			MetricValue: &pb.Metric_Delta{
+				Delta: delta,
+			},
+		}
+	}
+
+	return nil
+}
+
+func ConvertToProtoMetrics(src []models.Metric) ([]*pb.Metric, error) {
+	converted := make([]*pb.Metric, 0, len(src))
+
+	for _, m := range src {
+		metric := convertToProtoMetric(m)
+		if metric == nil {
+			return nil, fmt.Errorf("failed to convert metric %+v", m)
+		}
+		converted = append(converted, metric)
+	}
+
+	return converted, nil
+}
+
+func convertFromProtoToMetric(src *pb.Metric) (models.Metric, error) {
+	var converted models.Metric
+	switch src.MType {
+	case models.GaugeType:
+		value, ok := src.MetricValue.(*pb.Metric_Value)
+		if !ok {
+			return nil, fmt.Errorf("invalid gauge value: %v", src.MetricValue)
+		}
+		converted = models.NewGauge(src.Id, value.Value)
+
+	case models.CounterType:
+		delta, ok := src.MetricValue.(*pb.Metric_Delta)
+		if !ok {
+			return nil, fmt.Errorf("invalid counter value: %v", src.MetricValue)
+		}
+		converted = models.NewCounter(src.Id, delta.Delta)
+
+	default:
+		return nil, fmt.Errorf("unknown metric type: %s", src.MType)
+	}
+
+	return converted, nil
+}
+
+func ConvertFromProtoToMetrics(src []*pb.Metric) ([]models.Metric, error) {
+	converted := make([]models.Metric, 0, len(src))
+
+	for _, m := range src {
+		metric, err := convertFromProtoToMetric(m)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert metric %+v", m)
+		}
 		converted = append(converted, metric)
 	}
 

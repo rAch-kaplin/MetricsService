@@ -25,17 +25,22 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	agCfg "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/config/agent"
 	"github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/handlers/agent"
 	repo "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/repository"
 	auc "github.com/rAch-kaplin/mipt-golang-course/MetricsService/internal/usecases/agent"
+	pb "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/grpc-metrics"
 	log "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/logger"
 	workerpool "github.com/rAch-kaplin/mipt-golang-course/MetricsService/pkg/worker-pool"
 )
 
+// Variables for the agent configuration
 var (
-	endPointAddr   string
+	httpAddress    string
+	grpcAddress    string
 	pollInterval   int
 	reportInterval int
 	rateLimit      int
@@ -43,6 +48,7 @@ var (
 	opts           *agCfg.Options
 )
 
+// Root command for the agent
 var rootCmd = &cobra.Command{
 	Use:     "agent",
 	Short:   "MetricService",
@@ -53,7 +59,8 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().StringVarP(&endPointAddr, "a", "a", agCfg.DefaultEndpoint, "endpoint HTTP-server addr")
+	rootCmd.Flags().StringVarP(&httpAddress, "a", "a", agCfg.DefaultHTTPAddress, "endpoint HTTP-server addr")
+	rootCmd.Flags().StringVarP(&grpcAddress, "g", "g", agCfg.DefaultGRPCAddress, "endpoint GRPC-server addr")
 	rootCmd.Flags().IntVarP(&pollInterval, "p", "p", agCfg.DefaultPollInterval, "PollInterval value")
 	rootCmd.Flags().IntVarP(&reportInterval, "r", "r", agCfg.DefaultReportInterval, "PollInterval value")
 	rootCmd.Flags().StringVarP(&key, "k", "k", agCfg.DefaultKey, "key for hash")
@@ -63,14 +70,16 @@ func init() {
 func preRunE(cmd *cobra.Command, args []string) error {
 	var err error
 	opts, err = agCfg.ParseOptionsFromCmdAndEnvs(cmd, &agCfg.Options{
-		EndPointAddr:   endPointAddr,
+		HTTPAddress:    httpAddress,
+		GRPCAddress:    grpcAddress,
 		PollInterval:   pollInterval,
 		ReportInterval: reportInterval,
 		Key:            key,
 		RateLimit:      rateLimit})
 
 	opts = agCfg.NewAgentOptions(
-		agCfg.WithAddress(opts.EndPointAddr),
+		agCfg.WithAddress(opts.HTTPAddress),
+		agCfg.WithGRPCAddress(opts.GRPCAddress),
 		agCfg.WithPollInterval(opts.PollInterval),
 		agCfg.WithReportInterval(opts.ReportInterval),
 		agCfg.WithRateLimit(opts.RateLimit),
@@ -96,47 +105,80 @@ func runE(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Create a channel for the shutdown signal.
 	stop := make(chan os.Signal, 1)
+	// Notify the agent about the shutdown signal.
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
+	// Create a goroutine for the agent, which will wait for the shutdown signal.
 	go func() {
 		<-stop
 		cancel()
 	}()
 
+	// startAgent is a function that starts the agent.
+	// It creating use case for metrics,
+	// initializing the http and grpc clients, storage, worker pool, and starting the agent.
 	startAgent(ctx)
 
 	return nil
 }
 
 func startAgent(ctx context.Context) {
+	// Create a memory storage for the agent.
 	metricStorage := repo.NewMemStorage()
+	// Create a use case for the agent.
 	agentUsecase := agent.NewAgent(auc.NewAgentUsecase(metricStorage, metricStorage))
 
+	// Create a http client for the agent.
 	client := resty.New().
 		SetTimeout(5 * time.Second).
-		SetBaseURL("http://" + opts.EndPointAddr)
+		SetBaseURL("http://" + opts.HTTPAddress)
 
+	// Create a worker pool for the agent.
 	wp := workerpool.New(opts.RateLimit)
 
+	// Start the worker pool.
 	wp.Start(ctx)
 	defer wp.Wait()
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 
+	// Create a goroutine for the agent, which will collect metrics.
 	go func() {
 		defer wg.Done()
 		agent.CollectMetrics(ctx, agentUsecase, opts.PollInterval)
 	}()
 
+	// Create a goroutine for the agent, which will send metrics to the server.
 	go func() {
 		defer wg.Done()
 		agent.SendMetrics(ctx, agentUsecase, client, wp, opts.ReportInterval, opts.Key)
 	}()
 
+	// Create a connection to the GRPC server.
+	conn, err := grpc.NewClient(opts.GRPCAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Error().Err(err).Msg("failed to connect to GRPC server")
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	// Create a grpc client for the agent.
+	grpcClient := pb.NewMetricsServiceClient(conn)
+
+	// Create a goroutine for the agent, which will send metrics to the GRPC server.
+	go func() {
+		defer wg.Done()
+		agent.SendMetricsGRPC(ctx, agentUsecase, grpcClient, wp, opts.ReportInterval, opts.Key)
+	}()
+
+	// Wait for the shutdown signal.
 	<-ctx.Done()
 
+	// Wait for the agent to finish.
 	wg.Wait()
 
 	log.Info().Msg("Agent stopped gracefully.")
