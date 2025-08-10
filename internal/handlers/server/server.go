@@ -1,3 +1,9 @@
+// @Title MetricsService API handlers
+// @Description This file contains the server handlers for the MetricsService API.
+// @Author rAch-kaplin
+// @Version 1.0.0
+// @Since 2025-07-29
+
 package server
 
 import (
@@ -30,6 +36,17 @@ func NewServer(uc *srvUsecase.MetricUsecase, puc *ping.PingUsecase) *Server {
 	}
 }
 
+// @Title GetMetric
+// @Description Get a metric by type and name from URL parameters
+// @Tags metrics
+// @Produces text/plain
+// @Param mType path string true "Metric type"
+// @Param mName path string true "Metric name"
+// @Success 200 {string} string "Metric value"
+// @Failure 400 {string} string "Bad request"
+// @Failure 404 {string} string "Metric not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router /value/{mType}/{mName} [GET]
 func (srv *Server) GetMetric() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		mType := chi.URLParam(req, "mType")
@@ -64,6 +81,14 @@ func (srv *Server) GetMetric() http.HandlerFunc {
 	}
 }
 
+// @Title GetAllMetrics
+// @Description Get all metrics
+// @Tags metrics
+// @Produces text/html
+// @Success 200 {string} string "Metrics table"
+// @Failure 404 {string} string "Metrics not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router / [GET]
 func (srv *Server) GetAllMetrics() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		metrics, err := srv.MetricUsecase.GetAllMetrics(req.Context())
@@ -125,6 +150,17 @@ func (srv *Server) GetAllMetrics() http.HandlerFunc {
 	}
 }
 
+// @Title UpdateMetric
+// @Description Update a metric by type, name and value from URL parameters
+// @Tags metrics
+// @Produces text/plain
+// @Param mType path string true "Metric type"
+// @Param mName path string true "Metric name"
+// @Param mValue path string true "Metric value"
+// @Success 200 {string} string "Metric updated successfully"
+// @Failure 400 {string} string "Bad request - invalid metric value or name not specified"
+// @Failure 500 {string} string "Internal server error"
+// @Router /update/{mType}/{mName}/{mValue} [POST]
 func (srv *Server) UpdateMetric() http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		mType := chi.URLParam(req, "mType")
@@ -165,6 +201,16 @@ func (srv *Server) UpdateMetric() http.HandlerFunc {
 	}
 }
 
+// @Title GetMetricsHandlerJSON
+// @Description Get a metric by type and name
+// @Tags metrics
+// @Produces application/json
+// @Accept application/json
+// @Failure 400 {string} string "Invalid JSON body"
+// @Failure 415 {string} string "Unsupported media type"
+// @Failure 404 {string} string "Metric not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router /value [POST]
 func (srv *Server) GetMetricsHandlerJSON() http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		var jsonMetric serialize.Metric
@@ -203,6 +249,16 @@ func (srv *Server) GetMetricsHandlerJSON() http.HandlerFunc {
 	}
 }
 
+// @Title UpdateMetricsHandlerJSON
+// @Description Update a metric by type and name
+// @Tags metrics
+// @Produces application/json
+// @Accept application/json
+// @Failure 400 {string} string "Invalid JSON body"
+// @Failure 415 {string} string "Unsupported media type"
+// @Failure 404 {string} string "Metric not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router /update [POST]
 func (srv *Server) UpdateMetricsHandlerJSON() http.HandlerFunc {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		var reader io.Reader
@@ -268,6 +324,16 @@ func (srv *Server) UpdateMetricsHandlerJSON() http.HandlerFunc {
 	}
 }
 
+// @Title UpdatesMetricsHandlerJSON
+// @Description Update a list of metrics
+// @Tags metrics
+// @Produces application/json
+// @Accept application/json
+// @Success 200 {string} string "Metrics updated successfully"
+// @Failure 400 {string} string "Invalid JSON body"
+// @Failure 415 {string} string "Unsupported media type"
+// @Failure 500 {string} string "Internal server error"
+// @Router /updates [POST]
 func (srv *Server) UpdatesMetricsHandlerJSON() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		var reader io.Reader
@@ -316,6 +382,13 @@ func (srv *Server) UpdatesMetricsHandlerJSON() http.HandlerFunc {
 	}
 }
 
+// @Title PingHandler
+// @Description Check if the database is reachable
+// @Tags metrics
+// @Produces text/plain
+// @Success 200 {string} string "OK"
+// @Failure 500 {string} string "Database connection failed"
+// @Router /ping [GET]
 func (srv *Server) PingHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := srv.PingUsecase.Check(r.Context()); err != nil {
